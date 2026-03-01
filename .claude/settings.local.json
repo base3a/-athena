@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(export PATH=\"$PATH:/usr/local/bin:/opt/homebrew/bin\")",
+      "Bash(zsh -i -c 'which node && node --version && which npm')",
+      "Bash(bash -l -c 'which node 2>&1; node --version 2>&1')",
+      "Bash(mdfind:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)",
+      "Bash(curl:*)",
+      "Bash(python3 -c:*)",
+      "Bash(npx tsc --noEmit)"
+    ]
+  }
+}
