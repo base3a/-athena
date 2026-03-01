@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AthenaLogo from "@/components/AthenaLogo";
 import TickerInput from "@/components/TickerInput";
 import StatCard from "@/components/StatCard";
@@ -34,7 +35,7 @@ export default function HomePage() {
           </span>
         </div>
         <nav className="hidden md:flex items-center gap-8">
-          {["Markets", "Portfolio", "Screener", "Research"].map((item) => (
+          {["Markets", "Screener", "Research"].map((item) => (
             <a
               key={item}
               href="#"
@@ -43,6 +44,12 @@ export default function HomePage() {
               {item}
             </a>
           ))}
+          <Link
+            href="/portfolio"
+            className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+          >
+            Portfolio
+          </Link>
         </nav>
         <div className="flex items-center gap-3">
           <button className="text-[13px] text-[#888] hover:text-white tracking-widest uppercase font-medium transition-colors duration-200 hidden md:block">

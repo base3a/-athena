@@ -129,9 +129,15 @@ export default async function AnalyzePage({
           <TickerInput compact />
         </div>
 
-        {/* Language selector + Home — grouped on the right */}
+        {/* Language selector + Portfolio + Home — grouped on the right */}
         <div className="ml-auto flex items-center gap-4">
           <LanguageSelector />
+          <Link
+            href="/portfolio"
+            className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+          >
+            Portfolio
+          </Link>
           <Link
             href="/"
             className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
