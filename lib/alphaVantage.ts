@@ -1,3 +1,5 @@
+import { getMockData } from "./mockData";
+
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface StockOverview {
   Symbol: string;
@@ -50,7 +52,7 @@ export interface GlobalQuote {
 }
 
 export type FetchResult =
-  | { success: true; overview: StockOverview; quote: GlobalQuote | null }
+  | { success: true; overview: StockOverview; quote: GlobalQuote | null; isMockData?: boolean }
   | { success: false; error: "rate_limited" | "invalid_ticker" | "network_error" };
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -110,6 +112,11 @@ export async function fetchStockData(ticker: string): Promise<FetchResult> {
 
     // Rate limit / premium feature notice
     if (overview.Note || overview.Information) {
+      // In development, transparently fall back to mock data if available
+      if (process.env.NODE_ENV === "development") {
+        const mock = getMockData(ticker);
+        if (mock) return { success: true, ...mock, isMockData: true };
+      }
       return { success: false, error: "rate_limited" };
     }
 

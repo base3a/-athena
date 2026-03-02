@@ -4,12 +4,11 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-// ── Mini verdict via Claude ────────────────────────────────────────────────────
-// Kept deliberately short — only the verdict word is needed, not a full analysis.
+// ── Mini verdict + confidence + summary via Claude ─────────────────────────────
 async function getMiniVerdict(
   symbol: string,
   overview: StockOverview
-): Promise<string | null> {
+): Promise<{ verdict: string | null; confidence: number | null; summary: string | null }> {
   try {
     const prompt = `You are Athena, a precise AI investment analyst.
 Given these fundamentals for ${symbol} (${overview.Name}, ${overview.Exchange}):
@@ -21,24 +20,33 @@ Given these fundamentals for ${symbol} (${overview.Name}, ${overview.Exchange}):
 - Analyst Target: ${overview.AnalystTargetPrice}
 - 52W Range: ${overview["52WeekLow"]}–${overview["52WeekHigh"]}
 
-Provide your investment verdict. Reply with ONLY one of these four strings, nothing else:
+Reply with ONLY this exact format (three lines, nothing else):
 VERDICT: BUY
-VERDICT: HOLD
-VERDICT: WATCH
-VERDICT: AVOID`;
+CONFIDENCE: 8
+SUMMARY: One direct sentence under 14 words capturing the single key risk or opportunity.`;
 
     const msg = await client.messages.create({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 15,
+      max_tokens: 80,
       messages: [{ role: "user", content: prompt }],
     });
 
     const text =
       msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
-    const match = text.match(/VERDICT:\s*(BUY|HOLD|WATCH|AVOID)/i);
-    return match ? match[1].toUpperCase() : null;
+
+    const verdictMatch    = text.match(/VERDICT:\s*(BUY|HOLD|WATCH|AVOID)/i);
+    const confidenceMatch = text.match(/CONFIDENCE:\s*(\d+)/i);
+    const summaryMatch    = text.match(/SUMMARY:\s*(.+)/i);
+
+    const verdict = verdictMatch ? verdictMatch[1].toUpperCase() : null;
+    const rawConf = confidenceMatch ? parseInt(confidenceMatch[1], 10) : null;
+    const confidence =
+      rawConf !== null && rawConf >= 1 && rawConf <= 10 ? rawConf : null;
+    const summary = summaryMatch ? summaryMatch[1].trim() : null;
+
+    return { verdict, confidence, summary };
   } catch {
-    return null;
+    return { verdict: null, confidence: null, summary: null };
   }
 }
 
@@ -61,37 +69,39 @@ export async function GET(req: NextRequest) {
 
   const { overview, quote } = result;
 
-  const rawPrice = quote?.["05. price"] ?? null;
-  const rawChange = quote?.["09. change"] ?? null;
+  const rawPrice     = quote?.["05. price"] ?? null;
+  const rawChange    = quote?.["09. change"] ?? null;
   const rawChangePct = quote?.["10. change percent"]?.replace("%", "") ?? null;
-  const isPositive = rawChange ? parseFloat(rawChange) >= 0 : null;
+  const isPositive   = rawChange ? parseFloat(rawChange) >= 0 : null;
 
   const price = rawPrice ? parseFloat(rawPrice).toFixed(2) : null;
-  const change =
-    rawChange
-      ? (parseFloat(rawChange) >= 0 ? "+" : "") + parseFloat(rawChange).toFixed(2)
-      : null;
-  const changePct =
-    rawChangePct
-      ? (parseFloat(rawChangePct) >= 0 ? "+" : "") + parseFloat(rawChangePct).toFixed(2)
-      : null;
+  const change = rawChange
+    ? (parseFloat(rawChange) >= 0 ? "+" : "") + parseFloat(rawChange).toFixed(2)
+    : null;
+  const changePct = rawChangePct
+    ? (parseFloat(rawChangePct) >= 0 ? "+" : "") +
+      parseFloat(rawChangePct).toFixed(2)
+    : null;
 
-  // Verdict is only fetched when explicitly requested (i.e. on stock add)
-  // so we don't spend Claude tokens on every page refresh.
-  let verdict: string | null = null;
+  // Verdict + confidence + summary are only fetched on stock add
+  let verdict: string | null    = null;
+  let confidence: number | null = null;
+  let summary: string | null    = null;
   if (includeVerdict) {
-    verdict = await getMiniVerdict(symbol, overview);
+    ({ verdict, confidence, summary } = await getMiniVerdict(symbol, overview));
   }
 
   return NextResponse.json({
-    symbol: overview.Symbol,
-    name: overview.Name,
-    exchange: overview.Exchange !== "None" ? overview.Exchange : null,
-    sector: overview.Sector !== "None" ? overview.Sector : null,
+    symbol:    overview.Symbol,
+    name:      overview.Name,
+    exchange:  overview.Exchange !== "None" ? overview.Exchange : null,
+    sector:    overview.Sector   !== "None" ? overview.Sector   : null,
     price,
     change,
     changePct,
     isPositive,
     verdict,
+    confidence,
+    summary,
   });
 }

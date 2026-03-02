@@ -32,6 +32,9 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 400;
 }
 
 /* Scrollbar */
@@ -87,23 +90,36 @@ input:-webkit-autofill:focus {
 
 /* ── Loading & animation utilities ─────────────────────────────────────── */
 
-/* Skeleton shimmer — sweeps a gold highlight across grey blocks */
+/* Skeleton shimmer — sweeps a visible gold highlight across blocks */
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
+/* Pulsing gold border for outlined card ghosts */
+@keyframes gold-pulse {
+  0%, 100% { border-color: rgba(212,160,23,0.07); }
+  50%       { border-color: rgba(212,160,23,0.22); }
+}
+
 .skeleton {
   background: linear-gradient(
     90deg,
-    #0a0a0a 0%,
-    #0a0a0a 30%,
-    #131100 50%,
-    #0a0a0a 70%,
-    #0a0a0a 100%
+    #0d0d0d 0%,
+    #0d0d0d 30%,
+    rgba(212,160,23,0.14) 50%,
+    #0d0d0d 70%,
+    #0d0d0d 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 2.4s ease-in-out infinite;
+  animation: shimmer 2.2s ease-in-out infinite;
+}
+
+/* Card ghost — transparent body, softly pulsing gold border */
+.skeleton-card {
+  background: transparent;
+  border: 1px solid rgba(212,160,23,0.07);
+  animation: gold-pulse 2.4s ease-in-out infinite;
 }
 
 /* Gold progress bar sweep — indeterminate top loader */
@@ -134,4 +150,18 @@ input:-webkit-autofill:focus {
 
 .animate-fade-in-up {
   animation: fade-in-up 0.45s ease-out both;
+}
+
+/* Inline confirmation text — fades in, holds, then fades out */
+@keyframes confirm-fade {
+  0%   { opacity: 0; transform: translateY(-2px); }
+  12%  { opacity: 1; transform: translateY(0); }
+  72%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Smart search dropdown — slides down from input */
+@keyframes dropdown-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

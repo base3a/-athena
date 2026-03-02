@@ -131,13 +131,14 @@ CONFIDENCE: [write a single integer from 1 to 10]
 
 ### 12. Final Verdict
 VERDICT: [Write exactly one of: BUY or HOLD or WATCH or AVOID]
+SUMMARY: [One sharp, complete sentence explaining the verdict. Begin with the company name. Write whole numbers only — never use decimal notation like "33.2x" or "$3.5B". For example: "Apple is a cash-generating machine trading at a fair price for long-term investors."]
 TAKEAWAY_1: [The single most important reason for this verdict — max 8 plain-English words, no jargon]
 TAKEAWAY_2: [Key valuation or growth insight — max 8 plain-English words, no jargon]
 TAKEAWAY_3: [Most critical risk or opportunity to watch — max 8 plain-English words, no jargon]
 WHO_FOR: [One plain sentence. Who is this stock right for? No jargon. E.g. "Patient investors who want slow, reliable growth over many years."]
 WHO_AVOID: [One plain sentence. Who should stay away? No jargon. E.g. "Anyone who needs stable income or can't handle sharp price drops."]
 TIMEFRAME: [One plain sentence. Is this better for long-term buy-and-hold investors or short-term traders? Why?]
-[1-2 sharp, decisive sentences justifying the verdict. Make it memorable and clear for a beginner investor.]
+[1-2 additional sentences of supporting reasoning. Be specific and data-driven.]
 
 ### 13. What Would Change This Verdict?
 [Give exactly 2-3 concrete, measurable financial triggers that would cause you to change the verdict. For example: "If revenue growth exceeds 20% for two consecutive quarters" or "If operating margin falls below 10%." Be specific — no vague statements.]`;

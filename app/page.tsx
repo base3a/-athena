@@ -35,7 +35,13 @@ export default function HomePage() {
           </span>
         </div>
         <nav className="hidden md:flex items-center gap-8">
-          {["Markets", "Screener", "Research"].map((item) => (
+          <Link
+            href="/markets"
+            className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+          >
+            Markets
+          </Link>
+          {["Screener", "Research"].map((item) => (
             <a
               key={item}
               href="#"
@@ -93,13 +99,13 @@ export default function HomePage() {
 
         {/* Subtitle */}
         <p
-          className="mb-3 font-light tracking-[0.4em] uppercase text-[#d4a017] text-sm"
+          className="mb-3 font-semibold tracking-[0.4em] uppercase text-[#d4a017] text-sm"
         >
           AI-Powered Stock Analysis
         </p>
 
         {/* Tagline */}
-        <p className="mb-14 text-[#666] text-sm max-w-md leading-relaxed font-light tracking-wide">
+        <p className="mb-14 text-[#888] text-sm max-w-md leading-relaxed font-normal tracking-wide">
           Institutional-grade intelligence for every investor.
           <br />
           Enter a ticker to unlock a complete AI-driven market deep-dive.
@@ -110,9 +116,9 @@ export default function HomePage() {
 
         {/* Divider */}
         <div className="flex items-center gap-4 my-16 w-full max-w-xl">
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#2a2a2a] to-[#2a2a2a]" />
-          <span className="text-[10px] text-[#444] tracking-widest uppercase">Analysis Suite</span>
-          <div className="flex-1 h-px bg-gradient-to-l from-transparent via-[#2a2a2a] to-[#2a2a2a]" />
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#333] to-[#333]" />
+          <span className="text-[10px] text-[#666] tracking-widest uppercase">Analysis Suite</span>
+          <div className="flex-1 h-px bg-gradient-to-l from-transparent via-[#333] to-[#333]" />
         </div>
 
         {/* Feature cards */}
@@ -131,12 +137,12 @@ export default function HomePage() {
       <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span
-            className="text-[11px] text-[#444] tracking-widest uppercase"
+            className="text-[11px] text-[#666] tracking-widest uppercase"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
             Athena &copy; {new Date().getFullYear()}
           </span>
-          <p className="text-[11px] text-[#333] tracking-wide">
+          <p className="text-[11px] text-[#555] tracking-wide">
             For informational purposes only. Not financial advice.
           </p>
           <div className="flex items-center gap-5">
@@ -144,7 +150,7 @@ export default function HomePage() {
               <a
                 key={link}
                 href="#"
-                className="text-[11px] text-[#444] hover:text-[#d4a017] tracking-widest uppercase transition-colors duration-200"
+                className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase transition-colors duration-200"
               >
                 {link}
               </a>

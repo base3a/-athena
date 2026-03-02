@@ -12,7 +12,12 @@
       "Bash(xargs:*)",
       "Bash(curl:*)",
       "Bash(python3 -c:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx --yes tsc --noEmit --project /Users/basirali/Desktop/Athena/tsconfig.json)",
+      "Bash(npx tsc --noEmit --project /Users/basirali/Desktop/Athena/tsconfig.json)",
+      "Bash(npx tsc --noEmit --project tsconfig.json)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f \"next-server\")"
     ]
   }
 }

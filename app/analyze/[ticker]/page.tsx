@@ -85,7 +85,7 @@ export default async function AnalyzePage({
     return <ErrorState error={result.error} symbol={symbol} />;
   }
 
-  const { overview, quote } = result;
+  const { overview, quote, isMockData } = result;
 
   // Price & change data
   const price = quote?.["05. price"] ?? null;
@@ -151,7 +151,7 @@ export default async function AnalyzePage({
       <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-6 md:px-12 py-10">
 
         {/* Company identity + live price */}
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-10 pb-10 border-b border-[#161616]">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-14 pb-14 border-b border-[#161616]">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1
@@ -166,14 +166,22 @@ export default async function AnalyzePage({
               >
                 {overview.Exchange}
               </span>
+              {isMockData && (
+                <span
+                  className="px-2 py-0.5 text-[9px] tracking-widest uppercase rounded"
+                  style={{ border: "1px solid rgba(212,160,23,0.22)", background: "rgba(212,160,23,0.05)", color: "#8a6820" }}
+                >
+                  Demo Data
+                </span>
+              )}
               {overview.Country && overview.Country !== "None" && (
-                <span className="text-[10px] text-[#444] tracking-widest uppercase">
+                <span className="text-[10px] text-[#666] tracking-widest uppercase">
                   {overview.Country}
                 </span>
               )}
             </div>
-            <p className="text-[#bbb] text-xl font-light mb-2">{overview.Name}</p>
-            <p className="text-[#555] text-[11px] tracking-widest uppercase">
+            <p className="text-[#e8e8e8] text-xl font-normal mb-2">{overview.Name}</p>
+            <p className="text-[#888] text-[11px] tracking-widest uppercase">
               {overview.Sector !== "None" ? overview.Sector : ""}
               {overview.Sector !== "None" && overview.Industry !== "None" ? " • " : ""}
               {overview.Industry !== "None" ? overview.Industry : ""}
@@ -184,7 +192,7 @@ export default async function AnalyzePage({
             <div className="md:text-right">
               <p className="text-white font-bold mb-1" style={{ fontSize: "2.6rem", lineHeight: 1 }}>
                 ${parseFloat(price).toFixed(2)}
-                <span className="text-[#555] text-sm font-normal ml-1">{overview.Currency}</span>
+                <span className="text-[#777] text-sm font-normal ml-1">{overview.Currency}</span>
               </p>
               {change && changePctRaw && (
                 <p
@@ -197,7 +205,7 @@ export default async function AnalyzePage({
                 </p>
               )}
               {lastDay && (
-                <p className="text-[#444] text-[11px] tracking-widest">
+                <p className="text-[#777] text-[11px] tracking-widest">
                   As of {lastDay}
                 </p>
               )}
@@ -207,12 +215,12 @@ export default async function AnalyzePage({
 
         {/* ── Key metrics grid ── */}
         <SectionLabel>Key Metrics</SectionLabel>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-10">
-          <MetricCard label="Revenue TTM"    value={fmt(overview.RevenueTTM, "large")} />
-          <MetricCard label="Profit Margin"  value={fmt(overview.ProfitMargin, "percent")} />
-          <MetricCard label="EPS (TTM)"      value={fmt(overview.EPS, "currency")} />
-          <MetricCard label="52-Week High"   value={fmt(overview["52WeekHigh"], "currency")} />
-          <MetricCard label="52-Week Low"    value={fmt(overview["52WeekLow"], "currency")} />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-16">
+          <MetricCard label="Revenue TTM"   value={fmt(overview.RevenueTTM, "large")} />
+          <MetricCard label="Profit Margin" value={fmt(overview.ProfitMargin, "percent")} />
+          <MetricCard label="EPS (TTM)"     value={fmt(overview.EPS, "currency")} />
+          <MetricCard label="52-Week High"  value={fmt(overview["52WeekHigh"], "currency")} primary={false} />
+          <MetricCard label="52-Week Low"   value={fmt(overview["52WeekLow"], "currency")} primary={false} />
         </div>
 
         {/* ── Athena AI Analysis ── */}
@@ -221,8 +229,8 @@ export default async function AnalyzePage({
         {/* ── 52-week range bar ── */}
         {!isNaN(high52) && !isNaN(low52) && high52 !== low52 && (
           <div
-            className="mb-10 p-6 rounded-xl"
-            style={{ border: "1px solid #1a1a1a", background: "#080808" }}
+            className="mb-16 p-6 rounded-xl"
+            style={{ border: "1px solid #222", background: "#0f0f0f" }}
           >
             <SectionLabel>52-Week Range</SectionLabel>
             <div className="flex items-center gap-4 mt-4">
@@ -249,16 +257,16 @@ export default async function AnalyzePage({
             </div>
             {currentPrice && (
               <div className="flex items-center justify-between mt-3 px-0">
-                <span className="text-[11px] text-[#555] tracking-wide">
+                <span className="text-[11px] text-[#777] tracking-wide">
                   52W Low
                 </span>
                 <span className="text-[12px] font-semibold text-[#d4a017]">
                   Current: ${currentPrice.toFixed(2)}&nbsp;&nbsp;
-                  <span className="text-[#555] font-normal">
+                  <span className="text-[#777] font-normal">
                     ({rangePercent.toFixed(1)}% of range)
                   </span>
                 </span>
-                <span className="text-[11px] text-[#555] tracking-wide">
+                <span className="text-[11px] text-[#777] tracking-wide">
                   52W High
                 </span>
               </div>
@@ -268,16 +276,16 @@ export default async function AnalyzePage({
 
         {/* ── Company profile ── */}
         {overview.Description && overview.Description !== "None" && (
-          <div className="mb-10">
+          <div className="mb-16">
             <SectionLabel>Company Profile</SectionLabel>
-            <p className="text-[#888] text-sm leading-7 font-light mt-4 max-w-4xl">
+            <p className="text-[#c0c0c0] text-sm leading-7 font-normal mt-4 max-w-4xl">
               {overview.Description}
             </p>
           </div>
         )}
 
         {/* ── Additional metrics ── */}
-        <div className="mb-10">
+        <div className="mb-16">
           <SectionLabel>Additional Metrics</SectionLabel>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
             <SecondaryMetric label="Market Cap"        value={fmt(overview.MarketCapitalization, "large")} />
@@ -292,7 +300,7 @@ export default async function AnalyzePage({
         </div>
 
         {/* Moving averages */}
-        <div className="mb-12">
+        <div className="mb-16">
           <SectionLabel>Moving Averages</SectionLabel>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
             <SecondaryMetric label="50-Day MA"  value={fmt(overview["50DayMovingAverage"], "currency")} />
@@ -303,7 +311,7 @@ export default async function AnalyzePage({
         </div>
 
         {/* Data source note */}
-        <p className="text-center text-[10px] text-[#2a2a2a] tracking-widest uppercase">
+        <p className="text-center text-[10px] text-[#555] tracking-widest uppercase">
           Data sourced from Alpha Vantage &bull; For informational purposes only &bull; Not financial advice
         </p>
       </main>
@@ -312,7 +320,7 @@ export default async function AnalyzePage({
       <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-5">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span
-            className="text-[11px] text-[#333] tracking-widest uppercase"
+            className="text-[11px] text-[#555] tracking-widest uppercase"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
             Athena &copy; {new Date().getFullYear()}
@@ -322,7 +330,7 @@ export default async function AnalyzePage({
               <a
                 key={l}
                 href="#"
-                className="text-[11px] text-[#333] hover:text-[#d4a017] tracking-widest uppercase transition-colors"
+                className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase transition-colors"
               >
                 {l}
               </a>
@@ -339,27 +347,45 @@ export default async function AnalyzePage({
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-4">
-      <span className="text-[10px] text-[#555] tracking-[0.25em] uppercase font-semibold shrink-0">
+      <span className="text-[11px] text-[#aaa] tracking-[0.25em] uppercase font-semibold shrink-0">
         {children}
       </span>
-      <span className="flex-1 h-px" style={{ background: "linear-gradient(90deg, #1f1f1f, transparent)" }} />
+      <span className="flex-1 h-px" style={{ background: "linear-gradient(90deg, #2a2a2a, transparent)" }} />
     </div>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MetricCard({
+  label,
+  value,
+  primary = true,
+}: {
+  label: string;
+  value: string;
+  primary?: boolean;
+}) {
   return (
     <div
       className="p-4 rounded-xl flex flex-col gap-2"
       style={{
-        background: "linear-gradient(135deg, #0f0f0f 0%, #0a0a0a 100%)",
-        border: "1px solid #1f1f1f",
+        background: "linear-gradient(135deg, #111 0%, #0d0d0d 100%)",
+        border: primary ? "1px solid #252525" : "1px solid #1c1c1c",
       }}
     >
-      <p className="text-[10px] text-[#555] tracking-widest uppercase leading-tight">{label}</p>
+      <p
+        className="tracking-widest uppercase leading-tight"
+        style={{ fontSize: 10, color: primary ? "#aaa" : "#666" }}
+      >
+        {label}
+      </p>
       <p
         className="text-gold-gradient font-bold leading-none"
-        style={{ fontSize: value.length > 8 ? "1.2rem" : "1.5rem" }}
+        style={{
+          fontSize: primary
+            ? value.length > 8 ? "1.4rem" : "1.65rem"
+            : value.length > 8 ? "1.05rem" : "1.25rem",
+          opacity: primary ? 1 : 0.75,
+        }}
       >
         {value}
       </p>
@@ -371,10 +397,10 @@ function SecondaryMetric({ label, value }: { label: string; value: string }) {
   return (
     <div
       className="p-4 rounded-lg"
-      style={{ background: "#090909", border: "1px solid #161616" }}
+      style={{ background: "#0f0f0f", border: "1px solid #222" }}
     >
-      <p className="text-[10px] text-[#444] tracking-widest uppercase mb-1.5">{label}</p>
-      <p className="text-[#ccc] text-base font-medium">{value}</p>
+      <p className="text-[10px] text-[#888] tracking-widest uppercase mb-1.5">{label}</p>
+      <p className="text-[#e0e0e0] text-base font-medium">{value}</p>
     </div>
   );
 }

@@ -54,16 +54,14 @@ export default function PortfolioPage() {
 
         {/* Page title */}
         <div className="mb-10 pb-8 border-b border-[#161616]">
-          <div className="flex items-baseline gap-3 mb-2">
-            <h1
-              className="text-white font-bold tracking-wider"
-              style={{ fontFamily: "'Cinzel', serif", fontSize: "2rem", lineHeight: 1 }}
-            >
-              Portfolio
-            </h1>
-          </div>
-          <p className="text-[#444] text-sm font-light mt-2 leading-relaxed">
-            Add tickers to track live prices and Athena verdicts. Data persists across sessions.
+          <h1
+            className="text-white font-bold tracking-wider mb-2"
+            style={{ fontFamily: "'Cinzel', serif", fontSize: "2rem", lineHeight: 1 }}
+          >
+            Portfolio
+          </h1>
+          <p className="text-[#3a3a3a] text-sm font-light leading-relaxed">
+            Your positions. Your watchlist. Athena&apos;s verdict on each.
           </p>
         </div>
 
