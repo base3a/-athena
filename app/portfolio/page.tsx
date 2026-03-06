@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function PortfolioPage() {
   return (
-    <div className="relative min-h-screen bg-black flex flex-col">
+    <div className="relative flex-1 bg-black flex flex-col">
       {/* Subtle top glow */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[400px]"
@@ -38,11 +38,32 @@ export default function PortfolioPage() {
         </div>
 
         {/* Right controls */}
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-6">
           <LanguageSelector />
+          <nav className="hidden md:flex items-center gap-5">
+            <Link
+              href="/markets"
+              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            >
+              Markets
+            </Link>
+            <Link
+              href="/screener"
+              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            >
+              Screener
+            </Link>
+            <Link
+              href="/portfolio"
+              className="text-[11px] tracking-widest uppercase font-semibold transition-colors duration-200"
+              style={{ color: "#d4a017" }}
+            >
+              Portfolio
+            </Link>
+          </nav>
           <Link
             href="/"
-            className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
           >
             ← Home
           </Link>
@@ -69,20 +90,6 @@ export default function PortfolioPage() {
         <PortfolioClient />
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-5 mt-auto">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span
-            className="text-[11px] text-[#333] tracking-widest uppercase"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            Athena &copy; {new Date().getFullYear()}
-          </span>
-          <p className="text-[10px] text-[#2a2a2a] tracking-wide">
-            For informational purposes only. Not financial advice.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

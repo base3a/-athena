@@ -465,7 +465,7 @@ function RegimeIndicator() {
 
   return (
     <div
-      className="rounded-3xl p-14 md:p-20"
+      className="rounded-3xl p-10 md:p-14"
       style={{
         background: REGIME.bg,
         border:     `1px solid ${REGIME.border}`,
@@ -473,7 +473,7 @@ function RegimeIndicator() {
       }}
     >
       {/* Classification + score */}
-      <div className="flex flex-col items-center gap-3 mb-12">
+      <div className="flex flex-col items-center gap-2 mb-8">
         <p
           style={{
             fontSize:      9,
@@ -490,7 +490,7 @@ function RegimeIndicator() {
           <p
             style={{
               fontFamily:    "'Cinzel', serif",
-              fontSize:      "clamp(4rem, 10vw, 6.5rem)",
+              fontSize:      "clamp(3rem, 7.5vw, 5rem)",
               fontWeight:    700,
               color:         "#e0b82a",   /* slightly brighter for contrast */
               lineHeight:    1,
@@ -528,9 +528,9 @@ function RegimeIndicator() {
         {/* Interpretation */}
         <p
           style={{
-            fontSize:   "0.9rem",
+            fontSize:   "0.84rem",
             color:      "#888",
-            lineHeight: 1.65,
+            lineHeight: 1.6,
             textAlign:  "center",
             maxWidth:   480,
           }}
@@ -553,7 +553,7 @@ function RegimeIndicator() {
       </div>
 
       {/* Progress bar */}
-      <div style={{ position: "relative", paddingTop: 28, maxWidth: 600, margin: "0 auto" }}>
+      <div style={{ position: "relative", paddingTop: 20, maxWidth: 600, margin: "0 auto" }}>
         {/* Score marker */}
         <div
           style={{
@@ -593,7 +593,7 @@ function RegimeIndicator() {
         {/* Gradient bar */}
         <div
           style={{
-            height:       5,
+            height:       4,
             borderRadius: 3,
             background:
               "linear-gradient(to right, #f87171 0%, #fb923c 20%, #60a5fa 40%, #60a5fa 60%, #d4a017 70%, #4ade80 100%)",
@@ -759,7 +759,7 @@ export default function MarketsPage() {
   const adColor = ad >= 1 ? "#4ade80" : "#f87171";
 
   return (
-    <div className="relative min-h-screen bg-black flex flex-col">
+    <div className="relative flex-1 bg-black flex flex-col">
       {/* Top glow */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[500px]"
@@ -800,6 +800,12 @@ export default function MarketsPage() {
               style={{ color: "#d4a017" }}
             >
               Markets
+            </Link>
+            <Link
+              href="/screener"
+              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            >
+              Screener
             </Link>
             <Link
               href="/portfolio"
@@ -877,7 +883,7 @@ export default function MarketsPage() {
         {/* ──────────────────────────────────────────────────────────────────── */}
         {/* LAYER 2 — REGIME INDICATOR (most dominant)                         */}
         {/* ──────────────────────────────────────────────────────────────────── */}
-        <div className="mb-16">
+        <div className="mb-10">
           <RegimeIndicator />
         </div>
 
@@ -1043,20 +1049,6 @@ export default function MarketsPage() {
         </p>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-5 mt-auto">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span
-            className="text-[11px] text-[#333] tracking-widest uppercase"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            Athena &copy; {new Date().getFullYear()}
-          </span>
-          <p className="text-[10px] text-[#2a2a2a] tracking-wide">
-            For informational purposes only. Not financial advice.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -132,6 +132,8 @@ const jsonLd = {
 };
 
 // ── Root layout ────────────────────────────────────────────────────────────
+import SiteFooter from "@/components/SiteFooter";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -152,8 +154,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="antialiased bg-black text-white min-h-screen">
-        {children}
+      <body className="antialiased bg-black text-white">
+        <div className="min-h-screen flex flex-col">
+          {children}
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );

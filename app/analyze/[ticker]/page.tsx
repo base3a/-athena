@@ -104,7 +104,7 @@ export default async function AnalyzePage({
   }
 
   return (
-    <div className="relative min-h-screen bg-black flex flex-col">
+    <div className="relative flex-1 bg-black flex flex-col">
       {/* Subtle top glow */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[400px]"
@@ -316,28 +316,6 @@ export default async function AnalyzePage({
         </p>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-5">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span
-            className="text-[11px] text-[#555] tracking-widest uppercase"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            Athena &copy; {new Date().getFullYear()}
-          </span>
-          <div className="flex items-center gap-5">
-            {["Privacy", "Terms", "Contact"].map((l) => (
-              <a
-                key={l}
-                href="#"
-                className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase transition-colors"
-              >
-                {l}
-              </a>
-            ))}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

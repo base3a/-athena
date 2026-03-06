@@ -3,10 +3,11 @@ import AthenaLogo from "@/components/AthenaLogo";
 import TickerInput from "@/components/TickerInput";
 import StatCard from "@/components/StatCard";
 import FeatureCards from "@/components/FeatureCards";
+import LanguageSelector from "@/components/LanguageSelector";
 
 export default function HomePage() {
   return (
-    <div className="relative min-h-screen bg-black flex flex-col overflow-hidden">
+    <div className="relative flex-1 bg-black flex flex-col overflow-hidden">
       {/* Background radial glow — top center */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[600px]"
@@ -41,15 +42,18 @@ export default function HomePage() {
           >
             Markets
           </Link>
-          {["Screener", "Research"].map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              {item}
-            </a>
-          ))}
+          <Link
+            href="/screener"
+            className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+          >
+            Screener
+          </Link>
+          <a
+            href="#"
+            className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+          >
+            Research
+          </a>
           <Link
             href="/portfolio"
             className="text-[13px] text-[#888] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
@@ -58,6 +62,7 @@ export default function HomePage() {
           </Link>
         </nav>
         <div className="flex items-center gap-3">
+          <LanguageSelector />
           <button className="text-[13px] text-[#888] hover:text-white tracking-widest uppercase font-medium transition-colors duration-200 hidden md:block">
             Sign In
           </button>
@@ -114,6 +119,32 @@ export default function HomePage() {
         {/* Ticker Input */}
         <TickerInput />
 
+        {/* Market Regime Mini-Badge */}
+        <Link
+          href="/markets"
+          className="mt-5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full transition-opacity duration-200 hover:opacity-70"
+          style={{
+            border:        "1px solid rgba(212,160,23,0.26)",
+            background:    "rgba(212,160,23,0.06)",
+            fontSize:      11,
+            letterSpacing: "0.14em",
+            fontFamily:    "'Cinzel', serif",
+          }}
+        >
+          <span
+            style={{
+              width:        5,
+              height:       5,
+              borderRadius: "50%",
+              background:   "#a07820",
+              opacity:      0.8,
+              flexShrink:   0,
+            }}
+          />
+          <span style={{ color: "#c49a28", fontWeight: 700 }}>68</span>
+          <span style={{ color: "#8a6e2a", fontWeight: 500 }}>&nbsp;·&nbsp;Constructive</span>
+        </Link>
+
         {/* Divider */}
         <div className="flex items-center gap-4 my-16 w-full max-w-xl">
           <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#333] to-[#333]" />
@@ -133,31 +164,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-[#1a1a1a] px-8 py-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span
-            className="text-[11px] text-[#666] tracking-widest uppercase"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            Athena &copy; {new Date().getFullYear()}
-          </span>
-          <p className="text-[11px] text-[#555] tracking-wide">
-            For informational purposes only. Not financial advice.
-          </p>
-          <div className="flex items-center gap-5">
-            {["Privacy", "Terms", "Contact"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase transition-colors duration-200"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
