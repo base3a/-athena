@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function SiteFooter() {
   return (
     <footer
-      className="relative z-10 border-t border-[#141414] px-8 py-10"
+      className="relative z-10 border-t border-[#141414] px-4 md:px-8 py-8 md:py-10"
       style={{ background: "#000" }}
     >
       <div className="max-w-6xl mx-auto">
@@ -29,7 +29,7 @@ export default function SiteFooter() {
             {[
               { label: "Markets",   href: "/markets"   },
               { label: "Screener",  href: "/screener"  },
-              { label: "Research",  href: "#"          },
+              { label: "Research",  href: "/research"  },
               { label: "Portfolio", href: "/portfolio" },
             ].map(({ label, href }) => (
               <Link

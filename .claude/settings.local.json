@@ -17,7 +17,12 @@
       "Bash(npx tsc --noEmit --project /Users/basirali/Desktop/Athena/tsconfig.json)",
       "Bash(npx tsc --noEmit --project tsconfig.json)",
       "Bash(pkill -f \"next dev\")",
-      "Bash(pkill -f \"next-server\")"
+      "Bash(pkill -f \"next-server\")",
+      "Bash(killall node)",
+      "Bash(grep -n \"MobileNav\\\\|px-4\\\\|px-8\\\\|clamp\" /Users/basirali/Desktop/Athena/app/analyze/[ticker]/page.tsx)",
+      "Bash(npx next build)",
+      "Bash(pkill -f \"next\")",
+      "Bash(pkill -f \"next start\")"
     ]
   }
 }

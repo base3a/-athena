@@ -51,18 +51,20 @@ export default function FeatureCards() {
           key={feature.title}
           className="group flex flex-col gap-3 p-5 rounded-xl text-left cursor-default"
           style={{
-            background: "linear-gradient(135deg, #0e0e0e 0%, #090909 100%)",
+            background: "linear-gradient(135deg, #111 0%, #0c0c0c 100%)",
             border: "1px solid #1a1a1a",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.02)",
             transition: "border-color 0.3s ease, box-shadow 0.3s ease",
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLDivElement).style.borderColor = "#2a1f00";
             (e.currentTarget as HTMLDivElement).style.boxShadow =
-              "0 0 20px rgba(212,160,23,0.08)";
+              "0 0 20px rgba(212,160,23,0.08), inset 0 1px 0 rgba(255,255,255,0.02)";
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLDivElement).style.borderColor = "#1a1a1a";
-            (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
+            (e.currentTarget as HTMLDivElement).style.boxShadow =
+              "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.02)";
           }}
         >
           <div className="text-[#d4a017] opacity-70 group-hover:opacity-100 transition-opacity duration-300">
@@ -71,7 +73,7 @@ export default function FeatureCards() {
           <h3 className="text-white text-sm font-semibold tracking-wide">
             {feature.title}
           </h3>
-          <p className="text-[#555] text-[12px] leading-relaxed font-light">
+          <p className="text-[12px] leading-relaxed font-light" style={{ color: "#9A9A9A" }}>
             {feature.description}
           </p>
         </div>

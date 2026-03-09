@@ -1,7 +1,13 @@
 import { NextRequest } from "next/server";
 import { getMockData } from "@/lib/mockData";
+import { InMemoryCache } from "@/lib/cache";
 
 const BASE = "https://www.alphavantage.co/query";
+
+type ChartEntry = { date: string; close: number; high: number; low: number };
+
+// Module-level cache — keyed by uppercase ticker, TTL = 5 min
+const chartCache = new InMemoryCache<ChartEntry[]>();
 
 // ── Development mock chart generator ──────────────────────────────────────────
 // Produces a realistic-looking random-walk price series constrained within
@@ -56,6 +62,16 @@ export async function GET(req: NextRequest) {
     return new Response(JSON.stringify({ error: "missing_symbol" }), { status: 400 });
   }
 
+  const key = symbol.toUpperCase();
+
+  // 1. In-memory cache hit → return immediately, no network call
+  const hit = chartCache.get(key);
+  if (hit) {
+    return new Response(JSON.stringify({ data: hit }), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+    });
+  }
+
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "no_api_key" }), { status: 500 });
@@ -64,7 +80,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `${BASE}?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=full&apikey=${apiKey}`,
-      { next: { revalidate: 1800 } } // cache 30 min
+      { next: { revalidate: 1800 } } // HTTP-level cache 30 min
     );
 
     const data = await res.json();
@@ -78,6 +94,7 @@ export async function GET(req: NextRequest) {
           const low52  = parseFloat(mock.overview["52WeekLow"])  || 100;
           const currentPrice = parseFloat(mock.quote["05. price"]) || (high52 + low52) / 2;
           const entries = generateMockChart(high52, low52, currentPrice);
+          chartCache.set(key, entries);
           return new Response(JSON.stringify({ data: entries }), {
             headers: {
               "Content-Type": "application/json",
@@ -114,6 +131,9 @@ export async function GET(req: NextRequest) {
       .filter((e) => !isNaN(e.close))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-365); // last 365 trading days (~1 year)
+
+    // 2. Store in cache before returning
+    chartCache.set(key, entries);
 
     return new Response(JSON.stringify({ data: entries }), {
       headers: {

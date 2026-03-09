@@ -120,8 +120,8 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
             onKeyDown={handleKeyDown}
             placeholder={
               compact
-                ? "Search ticker or company…"
-                : "Search by ticker or company name…"
+                ? "Ticker or company (AAPL, NVDA…)"
+                : "Search company or ticker (Tesla, AAPL)"
             }
             maxLength={40}
             autoComplete="off"
@@ -131,7 +131,12 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
             className={`flex-1 bg-[#111] text-white placeholder-[#444] px-4
                        text-sm font-medium tracking-widest uppercase outline-none
                        transition-colors duration-200 ${compact ? "py-2.5" : "py-4"}`}
-            style={{ letterSpacing: query ? "0.15em" : "0.05em" }}
+            style={{
+              letterSpacing: query ? "0.15em" : "0.05em",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
           />
 
           {/* Analyze button */}
@@ -140,17 +145,19 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
             disabled={!query.trim()}
             className={`relative font-semibold text-sm tracking-widest uppercase
                        transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed
-                       overflow-hidden group ${compact ? "px-5 py-2.5" : "px-7 py-4"}`}
+                       overflow-hidden group ${compact ? "px-5 py-2.5" : "px-7"}`}
             style={{
-              background: "linear-gradient(135deg, #d4a017 0%, #a07810 100%)",
+              background: "linear-gradient(135deg, #d4af37 0%, #c9a227 100%)",
               color: "#000",
+              minHeight: compact ? 44 : 54,
+              boxShadow: "0 6px 20px rgba(212,175,55,0.25)",
             }}
           >
             <span className="relative z-10">Analyze</span>
             <span
               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
               style={{
-                background: "linear-gradient(135deg, #f0c040 0%, #d4a017 50%, #a07810 100%)",
+                background: "linear-gradient(135deg, #f0c040 0%, #d4af37 50%, #c9a227 100%)",
               }}
             />
           </button>
@@ -248,9 +255,14 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
 
       {/* Bottom hint text */}
       {!compact && (
-        <p className="mt-3 text-center text-[11px] text-[#555] tracking-widest uppercase">
-          NYSE &bull; NASDAQ &bull; S&amp;P 500 &bull; Global Markets
-        </p>
+        <div className="flex flex-col items-center gap-1 mt-3">
+          <p className="text-center text-[12px] font-medium" style={{ color: "#9A9A9A" }}>
+            Get a full AI stock analysis in seconds.
+          </p>
+          <p className="text-center text-[11px] tracking-widest uppercase" style={{ color: "#555" }}>
+            NYSE &bull; NASDAQ &bull; S&amp;P 500 &bull; Global Markets
+          </p>
+        </div>
       )}
     </div>
   );

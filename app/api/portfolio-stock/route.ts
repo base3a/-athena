@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchStockData, type StockOverview } from "@/lib/alphaVantage";
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-
 // ── Mini verdict + confidence + summary via Claude ─────────────────────────────
 async function getMiniVerdict(
   symbol: string,
   overview: StockOverview
 ): Promise<{ verdict: string | null; confidence: number | null; summary: string | null }> {
+  // Guard: if key is missing return empty rather than crashing the route
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { verdict: null, confidence: null, summary: null };
+
+  const client = new Anthropic({ apiKey });
+
   try {
     const prompt = `You are Athena, a precise AI investment analyst.
 Given these fundamentals for ${symbol} (${overview.Name}, ${overview.Exchange}):

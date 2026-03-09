@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import TickerInput from "@/components/TickerInput";
 import LanguageSelector from "@/components/LanguageSelector";
+import { ShareMarketCardButton } from "@/components/ShareButton";
+import MobileNav from "@/components/MobileNav";
 
 export const metadata: Metadata = {
   title: "Markets — Athena AI",
@@ -381,8 +383,8 @@ function SnapshotCard({ card }: { card: MarketCard }) {
       {/* Interpretation */}
       <p
         style={{
-          fontSize:   10,
-          color:      "#777",
+          fontSize:   11,
+          color:      "#9A9A9A",
           lineHeight: 1.55,
           borderTop:  "1px solid #161616",
           paddingTop: 10,
@@ -413,7 +415,7 @@ function InternalBar({
         <p
           style={{
             fontSize:      9,
-            color:         "#666",
+            color:         "#9A9A9A",
             letterSpacing: "0.18em",
             textTransform: "uppercase",
           }}
@@ -465,7 +467,7 @@ function RegimeIndicator() {
 
   return (
     <div
-      className="rounded-3xl p-10 md:p-14"
+      className="rounded-2xl p-5 sm:p-8 md:p-10"
       style={{
         background: REGIME.bg,
         border:     `1px solid ${REGIME.border}`,
@@ -477,7 +479,7 @@ function RegimeIndicator() {
         <p
           style={{
             fontSize:      9,
-            color:         "#555",
+            color:         "#7A7A7A",
             letterSpacing: "0.4em",
             textTransform: "uppercase",
           }}
@@ -503,7 +505,7 @@ function RegimeIndicator() {
             <span
               style={{
                 fontSize:      9,
-                color:         "#555",
+                color:         "#7A7A7A",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
               }}
@@ -529,7 +531,7 @@ function RegimeIndicator() {
         <p
           style={{
             fontSize:   "0.84rem",
-            color:      "#888",
+            color:      "#CFCFCF",
             lineHeight: 1.6,
             textAlign:  "center",
             maxWidth:   480,
@@ -542,7 +544,7 @@ function RegimeIndicator() {
         <p
           style={{
             fontSize:      10,
-            color:         "#4a4a4a",
+            color:         "#7A7A7A",
             letterSpacing: "0.06em",
             textAlign:     "center",
             marginTop:     2,
@@ -633,7 +635,7 @@ function SectorHeatmap() {
       <p
         style={{
           fontSize:      9,
-          color:         "#555",
+          color:         "#7A7A7A",
           letterSpacing: "0.22em",
           textTransform: "uppercase",
           marginBottom:  10,
@@ -661,7 +663,7 @@ function SectorHeatmap() {
             <p
               style={{
                 fontSize:      8,
-                color:         "#666",
+                color:         "#9A9A9A",
                 letterSpacing: "0.06em",
                 marginBottom:  4,
                 whiteSpace:    "nowrap",
@@ -694,61 +696,62 @@ function RiskRow({ signal }: { signal: RiskSignal }) {
   const dotColor = STATUS_DOT[signal.status];
   return (
     <div
-      className="flex items-center gap-5 py-5"
+      className="flex items-start gap-3 py-4 sm:py-5"
       style={{ borderBottom: "1px solid #141414" }}
     >
-      {/* Status dot */}
+      {/* Status dot — aligned to first line */}
       <div
+        className="mt-[5px] shrink-0"
         style={{
           width:        6,
           height:       6,
           borderRadius: "50%",
           background:   dotColor,
-          flexShrink:   0,
           boxShadow:    `0 0 6px ${dotColor}`,
         }}
       />
 
-      {/* Label */}
-      <p
-        style={{
-          fontFamily:    "'Cinzel', serif",
-          fontSize:      "0.75rem",
-          fontWeight:    600,
-          color:         "#888",
-          letterSpacing: "0.08em",
-          width:         130,
-          flexShrink:    0,
-        }}
-      >
-        {signal.label}
-      </p>
+      {/* Content: stacks on mobile, row on sm+ */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-5 flex-1 min-w-0">
+        {/* Label */}
+        <p
+          className="sm:w-[130px] sm:shrink-0 mb-0.5 sm:mb-0"
+          style={{
+            fontFamily:    "'Cinzel', serif",
+            fontSize:      "0.75rem",
+            fontWeight:    600,
+            color:         "#888",
+            letterSpacing: "0.08em",
+          }}
+        >
+          {signal.label}
+        </p>
 
-      {/* Value */}
-      <p
-        style={{
-          fontSize:      "0.8rem",
-          fontWeight:    600,
-          color:         dotColor,
-          letterSpacing: "0.04em",
-          width:         160,
-          flexShrink:    0,
-        }}
-      >
-        {signal.value}
-      </p>
+        {/* Value */}
+        <p
+          className="sm:w-[160px] sm:shrink-0 mb-1 sm:mb-0"
+          style={{
+            fontSize:      "0.8rem",
+            fontWeight:    600,
+            color:         dotColor,
+            letterSpacing: "0.04em",
+          }}
+        >
+          {signal.value}
+        </p>
 
-      {/* Detail */}
-      <p
-        style={{
-          fontSize:   "0.78rem",
-          color:      "#555",
-          lineHeight: 1.5,
-          flex:       1,
-        }}
-      >
-        {signal.detail}
-      </p>
+        {/* Detail */}
+        <p
+          className="sm:flex-1"
+          style={{
+            fontSize:   "0.78rem",
+            color:      "#9A9A9A",
+            lineHeight: 1.5,
+          }}
+        >
+          {signal.detail}
+        </p>
+      </div>
     </div>
   );
 }
@@ -770,7 +773,7 @@ export default function MarketsPage() {
       />
 
       {/* ── Header ── */}
-      <header className="relative z-10 flex items-center gap-6 px-8 py-4 border-b border-[#1a1a1a]">
+      <header className="relative z-10 flex items-center gap-4 md:gap-6 px-4 md:px-8 py-4 border-b border-[#1a1a1a]">
         <Link
           href="/"
           className="shrink-0 font-bold tracking-widest hover:opacity-80 transition-opacity"
@@ -791,7 +794,7 @@ export default function MarketsPage() {
         </div>
 
         {/* Right nav */}
-        <div className="ml-auto flex items-center gap-6">
+        <div className="ml-auto flex items-center gap-4 md:gap-6">
           <LanguageSelector />
           <nav className="hidden md:flex items-center gap-5">
             <Link
@@ -816,10 +819,11 @@ export default function MarketsPage() {
           </nav>
           <Link
             href="/"
-            className="text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            className="hidden sm:block text-[11px] text-[#555] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
           >
             ← Home
           </Link>
+          <MobileNav />
         </div>
       </header>
 
@@ -839,7 +843,7 @@ export default function MarketsPage() {
             >
               Markets
             </h1>
-            <p className="text-[#3a3a3a] text-sm font-light">
+            <p className="text-sm font-light" style={{ color: "#9A9A9A" }}>
               Risk-on or risk-off? One answer. No noise.
             </p>
           </div>
@@ -877,6 +881,13 @@ export default function MarketsPage() {
             <p style={{ fontSize: 9, color: "#333", letterSpacing: "0.12em" }}>
               Mar 2, 2026 · 16:00 EST
             </p>
+            {/* Share market regime card */}
+            <ShareMarketCardButton
+              score={REGIME.score}
+              label={REGIME.label}
+              interpretation={REGIME.interpretation}
+              positioning={REGIME.positioning}
+            />
           </div>
         </div>
 

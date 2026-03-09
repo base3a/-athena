@@ -1,60 +1,35 @@
-// Skeleton shown by Next.js Suspense while the server component fetches data.
-// Design intent: thin animated gold lines and card outlines — not dark grey blocks.
+"use client";
 
-// ── Thin text-line placeholder ────────────────────────────────────────────────
-function Line({
-  width = "100%",
-  height = 2,
-  delay = 0,
-  style = {},
-}: {
-  width?: string | number;
-  height?: number;
-  delay?: number;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div
-      className="skeleton"
-      style={{
-        height,
-        width,
-        borderRadius: 2,
-        animationDelay: `${delay}s`,
-        ...style,
-      }}
-    />
-  );
-}
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
-// ── Outlined card ghost — transparent body, pulsing gold border ───────────────
-function CardGhost({
-  height,
-  className = "",
-  style = {},
-  children,
-}: {
-  height?: number;
-  className?: string;
-  style?: React.CSSProperties;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={`skeleton-card rounded-xl ${className}`}
-      style={{ height, ...style }}
-    >
-      {children}
-    </div>
-  );
-}
+const STEPS = [
+  "Reading financial statements",
+  "Evaluating profitability metrics",
+  "Scanning market sentiment",
+  "Analyzing valuation multiples",
+  "Building investment thesis",
+] as const;
 
-// ── Loading skeleton ──────────────────────────────────────────────────────────
+// Each step reveals 1.5 s after the previous one
+const STEP_DELAY_MS = 1500;
+
 export default function Loading() {
-  return (
-    <div className="min-h-screen bg-black flex flex-col">
+  const pathname  = usePathname();
+  const ticker    = pathname?.split("/analyze/")[1]?.toUpperCase() ?? "…";
+  const [count, setCount] = useState(1); // how many steps are "active or done"
 
-      {/* Gold indeterminate progress bar */}
+  useEffect(() => {
+    const timers = STEPS.map((_, i) =>
+      setTimeout(() => setCount(i + 2), 400 + i * STEP_DELAY_MS),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div className="flex-1 bg-black flex flex-col items-center justify-center py-24">
+
+      {/* Indeterminate gold progress bar — fixed to top */}
       <div
         className="fixed top-0 left-0 right-0 z-50 overflow-hidden"
         style={{ height: 2, background: "#060400" }}
@@ -63,234 +38,187 @@ export default function Loading() {
           className="absolute inset-y-0"
           style={{
             width: "45%",
-            background: "linear-gradient(90deg, transparent 0%, #d4a017 50%, transparent 100%)",
+            background:
+              "linear-gradient(90deg, transparent 0%, #d4a017 50%, transparent 100%)",
             animation: "progress-sweep 1.8s ease-in-out infinite",
           }}
         />
       </div>
 
-      {/* ── Header ── */}
-      <div className="border-b border-[#1a1a1a] px-8 py-4 flex items-center gap-6">
-        {/* ATHENA wordmark placeholder */}
-        <Line width={88} height={3} style={{ borderRadius: 2 }} />
-        {/* Search bar placeholder */}
-        <CardGhost className="hidden md:block" style={{ height: 36, width: 260 }} />
-        {/* Nav links */}
-        <div className="ml-auto flex items-center gap-4">
-          <Line width={52} height={2} />
-          <Line width={44} height={2} delay={0.15} />
-        </div>
-      </div>
+      {/* Centre panel */}
+      <div className="text-center w-full max-w-sm px-6">
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 md:px-12 py-10">
-
-        {/* ── Company header ── */}
-        <div className="flex flex-col md:flex-row md:justify-between gap-6 mb-10 pb-10 border-b border-[#161616]">
-
-          {/* Left — ticker + name + sector */}
-          <div className="flex flex-col gap-4">
-            {/* Ticker + exchange badge */}
-            <div className="flex items-center gap-3">
-              <Line width={120} height={4} style={{ borderRadius: 2 }} />
-              <CardGhost style={{ height: 22, width: 60, borderRadius: 6 }} />
-            </div>
-            {/* Company full name */}
-            <Line width={240} height={2.5} delay={0.05} />
-            {/* Sector · Industry */}
-            <Line width={160} height={1.5} delay={0.1} />
-          </div>
-
-          {/* Right — price + change */}
-          <div className="flex flex-col items-start md:items-end gap-3">
-            <Line width={140} height={5} style={{ borderRadius: 2 }} />
-            <Line width={100} height={2.5} delay={0.08} />
-            <Line width={72} height={1.5} delay={0.14} />
-          </div>
-        </div>
-
-        {/* ── Key metrics section label ── */}
-        <div className="flex items-center gap-4 mb-4">
-          <Line width={88} height={1.5} />
-          <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-        </div>
-
-        {/* ── Key metrics — 5 card ghosts ── */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-10">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <CardGhost
-              key={i}
-              style={{ height: 88, borderRadius: 12, animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="p-4 flex flex-col justify-between h-full">
-                <Line width="50%" height={1.5} delay={i * 0.1} />
-                <Line width="70%" height={3} delay={i * 0.1 + 0.1} />
-              </div>
-            </CardGhost>
-          ))}
-        </div>
-
-        {/* ── Athena Intelligence section ── */}
-        <div className="mb-12">
-
-          {/* Section label */}
-          <div className="flex items-center gap-4 mb-6">
-            <Line width={130} height={1.5} />
-            <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-          </div>
-
-          {/* Verdict hero ghost — uses the scan line for premium feel */}
+        {/* Orbit rings */}
+        <div className="relative flex items-center justify-center w-16 h-16 mx-auto mb-8">
           <div
-            className="rounded-2xl overflow-hidden relative mb-4"
+            className="absolute w-16 h-16 rounded-full"
             style={{
-              border: "1px solid rgba(212,160,23,0.12)",
-              background: "linear-gradient(160deg, #090806 0%, #0c0a00 60%, #090806 100%)",
-              minHeight: 220,
-              padding: "2.5rem",
-              animation: "gold-pulse 2.4s ease-in-out infinite",
+              border: "1px dashed rgba(212,160,23,0.15)",
+              animation: "spin-slow 12s linear infinite",
             }}
+          />
+          <div
+            className="absolute w-11 h-11 rounded-full"
+            style={{
+              border: "1px solid rgba(212,160,23,0.22)",
+              animation: "spin-slow 8s linear infinite reverse",
+            }}
+          />
+          {/* Athena icon */}
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: "#0c0900", border: "1px solid #3d2d00" }}
           >
-            {/* Scanning line */}
-            <div
-              className="absolute inset-x-0 h-px pointer-events-none"
-              style={{
-                background: "linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.45) 50%, transparent 100%)",
-                animation: "scan-line 3.5s ease-in-out infinite",
-              }}
-            />
-            <div className="flex flex-col gap-5 max-w-sm">
-              {/* "Instant Decision" label line */}
-              <Line width={96} height={1.5} />
-              {/* Giant verdict word placeholder */}
-              <Line width={200} height={6} delay={0.1} style={{ borderRadius: 3 }} />
-              {/* Summary sentence */}
-              <div className="flex flex-col gap-2.5">
-                <Line width="90%" height={1.5} delay={0.18} />
-                <Line width="72%" height={1.5} delay={0.24} />
-              </div>
-              {/* Confidence bar area */}
-              <div className="flex flex-col gap-2 max-w-xs">
-                <div className="flex justify-between">
-                  <Line width={70} height={1.5} delay={0.28} />
-                  <Line width={28} height={1.5} delay={0.28} />
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#1a1300" }}>
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: "55%",
-                      background: "linear-gradient(90deg, transparent, rgba(212,160,23,0.3), transparent)",
-                      backgroundSize: "200% 100%",
-                      animation: "shimmer 2.2s ease-in-out infinite",
-                    }}
-                  />
-                </div>
-              </div>
-              {/* 3 takeaway lines */}
-              <div className="flex flex-col gap-3">
-                {[92, 80, 68].map((w, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div
-                      className="shrink-0 w-1.5 h-1.5 rounded-full"
-                      style={{ background: "rgba(212,160,23,0.2)" }}
-                    />
-                    <Line width={`${w}%`} height={1.5} delay={0.3 + i * 0.08} />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3C9 3 6.5 5 6.5 8C6.5 10.5 7.5 12 9 13L9 15L15 15L15 13C16.5 12 17.5 10.5 17.5 8C17.5 5 15 3 12 3Z"
+                stroke="#d4a017" strokeWidth="1.3" fill="none" strokeLinejoin="round"
+              />
+              <circle cx="9.8"  cy="8" r="1.3" fill="#d4a017" />
+              <circle cx="14.2" cy="8" r="1.3" fill="#d4a017" />
+              <path
+                d="M9 15L9 17C9 18.5 10.2 19.5 12 19.5C13.8 19.5 15 18.5 15 17L15 15"
+                stroke="#d4a017" strokeWidth="1.3" fill="none" strokeLinecap="round"
+              />
+            </svg>
           </div>
+        </div>
 
-          {/* Deep Dive ghost — collapsible section rows */}
-          <CardGhost style={{ borderRadius: 16 }}>
-            <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(212,160,23,0.06)" }}>
-              <div className="flex items-center justify-between">
-                <Line width={160} height={1.5} />
-                <Line width={68} height={1.5} />
-              </div>
-            </div>
-            <div className="p-3 flex flex-col gap-1.5">
-              {Array.from({ length: 6 }).map((_, i) => (
+        {/* Eyebrow */}
+        <p
+          className="mb-2"
+          style={{
+            fontFamily:    "'Cinzel', serif",
+            fontSize:      "0.6rem",
+            fontWeight:    600,
+            color:         "#d4a017",
+            letterSpacing: "0.38em",
+            textTransform: "uppercase",
+          }}
+        >
+          Athena Intelligence
+        </p>
+
+        {/* Ticker headline */}
+        <p
+          className="mb-10"
+          style={{
+            fontFamily:    "'Cinzel', serif",
+            fontSize:      "1.55rem",
+            fontWeight:    700,
+            color:         "#e8e8e8",
+            letterSpacing: "0.05em",
+            lineHeight:    1.2,
+          }}
+        >
+          Analyzing{" "}
+          <span style={{ color: "#d4a017" }}>{ticker}</span>
+        </p>
+
+        {/* Progressive step list */}
+        <div className="flex flex-col gap-4 text-left">
+          {STEPS.map((step, i) => {
+            const active  = i === count - 1;
+            const done    = i < count - 1;
+            const pending = i >= count;
+
+            return (
+              <div
+                key={step}
+                className="flex items-center gap-3"
+                style={{
+                  opacity:    pending ? 0.15 : 1,
+                  transform:  pending ? "translateY(4px)" : "translateY(0)",
+                  transition: "opacity 0.6s ease, transform 0.6s ease",
+                }}
+              >
+                {/* Status dot */}
                 <div
-                  key={i}
-                  className="rounded-xl px-4 py-3.5 flex items-center gap-3"
-                  style={{ border: "1px solid rgba(212,160,23,0.05)" }}
+                  className="shrink-0 rounded-full"
+                  style={{
+                    width:      6,
+                    height:     6,
+                    background: done || active ? "#d4a017" : "#252525",
+                    boxShadow:  active
+                      ? "0 0 8px rgba(212,160,23,0.7), 0 0 16px rgba(212,160,23,0.3)"
+                      : "none",
+                    transition: "background 0.4s ease, box-shadow 0.4s ease",
+                  }}
+                />
+
+                {/* Step label */}
+                <span
+                  className="flex-1"
+                  style={{
+                    fontSize:      "0.85rem",
+                    color:         done ? "#666" : active ? "#d4d4d4" : "#2a2a2a",
+                    letterSpacing: "0.01em",
+                    lineHeight:    1,
+                    transition:    "color 0.4s ease",
+                  }}
                 >
-                  <div
-                    className="shrink-0 w-5 h-5 rounded"
-                    style={{ border: "1px solid rgba(212,160,23,0.08)", background: "transparent" }}
-                  />
-                  <Line width={80 + i * 12} height={1.5} delay={i * 0.07} />
-                </div>
-              ))}
-            </div>
-          </CardGhost>
-        </div>
+                  {step}
+                </span>
 
-        {/* ── 52-week range ── */}
-        <div className="flex items-center gap-4 mb-4">
-          <Line width={100} height={1.5} />
-          <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-        </div>
-        <CardGhost style={{ height: 100, borderRadius: 12, marginBottom: 40 }}>
-          <div className="p-5 flex flex-col gap-3 h-full justify-center">
-            <div className="flex items-center gap-3">
-              <Line width={44} height={1.5} />
-              <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgba(212,160,23,0.05)" }} />
-              <Line width={44} height={1.5} />
-            </div>
-          </div>
-        </CardGhost>
+                {/* Active pulse */}
+                {active && (
+                  <span
+                    style={{
+                      fontSize:  7,
+                      color:     "#d4a017",
+                      animation: "pulse 1.4s ease-in-out infinite",
+                    }}
+                  >
+                    ●
+                  </span>
+                )}
 
-        {/* ── Company profile ── */}
-        <div className="flex items-center gap-4 mb-4">
-          <Line width={110} height={1.5} />
-          <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-        </div>
-        <div className="flex flex-col gap-2.5 mb-10 max-w-4xl">
-          {[100, 96, 100, 91, 86, 60].map((w, i) => (
-            <Line key={i} width={`${w}%`} height={1.5} delay={i * 0.05} />
-          ))}
-        </div>
-
-        {/* ── Additional metrics ── */}
-        <div className="flex items-center gap-4 mb-4">
-          <Line width={130} height={1.5} />
-          <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <CardGhost
-              key={i}
-              style={{ height: 68, borderRadius: 10, animationDelay: `${i * 0.08}s` }}
-            >
-              <div className="p-4 flex flex-col justify-between h-full">
-                <Line width="55%" height={1.5} delay={i * 0.08} />
-                <Line width="65%" height={2} delay={i * 0.08 + 0.1} />
+                {/* Done check */}
+                {done && (
+                  <span
+                    style={{
+                      fontSize: "0.65rem",
+                      color:    "#4a3a12",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓
+                  </span>
+                )}
               </div>
-            </CardGhost>
-          ))}
+            );
+          })}
         </div>
 
-        {/* ── Moving averages ── */}
-        <div className="flex items-center gap-4 mb-4">
-          <Line width={120} height={1.5} />
-          <div className="flex-1 h-px" style={{ background: "rgba(212,160,23,0.06)" }} />
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardGhost
-              key={i}
-              style={{ height: 68, borderRadius: 10, animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="p-4 flex flex-col justify-between h-full">
-                <Line width="55%" height={1.5} delay={i * 0.1} />
-                <Line width="65%" height={2} delay={i * 0.1 + 0.1} />
-              </div>
-            </CardGhost>
-          ))}
+        {/* Sweeping progress line */}
+        <div
+          className="mt-10 w-full relative overflow-hidden rounded-full"
+          style={{ height: 1, background: "#111000" }}
+        >
+          <div
+            className="absolute inset-y-0"
+            style={{
+              width:      "40%",
+              background: "linear-gradient(90deg, transparent, #d4a017, transparent)",
+              animation:  "progress-sweep 1.8s ease-in-out infinite",
+            }}
+          />
         </div>
 
-      </main>
+        {/* Subtle footnote */}
+        <p
+          className="mt-6"
+          style={{
+            fontSize:      "0.65rem",
+            color:         "#222",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+          }}
+        >
+          AI research engine · 13-point framework
+        </p>
+
+      </div>
     </div>
   );
 }

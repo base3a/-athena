@@ -198,10 +198,11 @@ export default function ScreenerClient() {
   // ── Toggle pill style helper ─────────────────────────────────────────────────
   function pillStyle(active: boolean): React.CSSProperties {
     return {
-      flex: 1, padding: "5px 0", borderRadius: 6, cursor: "pointer",
+      flex: 1, padding: "11px 0", minHeight: 44, borderRadius: 6, cursor: "pointer",
+      display: "flex", alignItems: "center", justifyContent: "center",
       border:      `1px solid ${active ? "rgba(212,160,23,0.4)" : "#1e1e1e"}`,
       background:  active ? "rgba(212,160,23,0.08)" : "transparent",
-      color:       active ? "#d4a017" : "#555",
+      color:       active ? "#d4a017" : "#9A9A9A",
       fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" as const,
       fontWeight: 600, transition: "all 0.12s ease",
     };
@@ -219,11 +220,12 @@ export default function ScreenerClient() {
               key={preset.id}
               onClick={() => applyPreset(preset.id)}
               style={{
-                padding:       "7px 18px",
+                padding:       "11px 18px",
+                minHeight:     44,
                 borderRadius:  8,
                 border:        `1px solid ${isActive ? "#d4a017" : "rgba(212,160,23,0.2)"}`,
                 background:    isActive ? "rgba(212,160,23,0.10)" : "transparent",
-                color:         isActive ? "#d4a017" : "#777",
+                color:         isActive ? "#d4a017" : "#9A9A9A",
                 fontSize:      10,
                 letterSpacing: "0.14em",
                 fontFamily:    "'Cinzel', serif",
@@ -239,12 +241,12 @@ export default function ScreenerClient() {
           );
         })}
         {activePreset && (
-          <p style={{ fontSize: 10, color: "#444", letterSpacing: "0.06em", marginLeft: 4 }}>
+          <p style={{ fontSize: 10, color: "#7A7A7A", letterSpacing: "0.06em", marginLeft: 4 }}>
             — {PRESETS.find((p) => p.id === activePreset)?.desc}
           </p>
         )}
       </div>
-      <p style={{ fontSize: 9.5, color: "#555", letterSpacing: "0.06em", marginTop: -8 }}>
+      <p style={{ fontSize: 9.5, color: "#7A7A7A", letterSpacing: "0.06em", marginTop: -8 }}>
         Preset applies quality thresholds automatically.
       </p>
 
@@ -258,7 +260,7 @@ export default function ScreenerClient() {
           {/* P/E Max */}
           <div className="flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
                 P/E Max
               </label>
               <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
@@ -275,7 +277,7 @@ export default function ScreenerClient() {
           {/* Profit Margin Min */}
           <div className="flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
                 Profit Margin Min
               </label>
               <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
@@ -292,7 +294,7 @@ export default function ScreenerClient() {
           {/* ROE Min */}
           <div className="flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
                 ROE Min
               </label>
               <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
@@ -308,7 +310,7 @@ export default function ScreenerClient() {
 
           {/* Market Cap */}
           <div className="flex flex-col gap-2.5">
-            <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
               Market Cap
             </label>
             <div className="flex gap-1.5">
@@ -322,7 +324,7 @@ export default function ScreenerClient() {
 
           {/* Sector */}
           <div className="flex flex-col gap-2.5">
-            <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
               Sector
             </label>
             <select
@@ -343,7 +345,7 @@ export default function ScreenerClient() {
 
           {/* Region */}
           <div className="flex flex-col gap-2.5">
-            <label style={{ fontSize: 8.5, color: "#4a4a4a", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
               Region
             </label>
             <div className="flex gap-1.5">

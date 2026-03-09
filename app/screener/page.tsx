@@ -88,7 +88,7 @@ export default function ScreenerPage() {
             >
               Screener
             </h1>
-            <p className="text-[#3a3a3a] text-sm font-light">
+            <p className="text-sm font-light" style={{ color: "#9A9A9A" }}>
               Quality-first discovery for long-term investors.
             </p>
           </div>

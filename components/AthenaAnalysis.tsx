@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, type ReactNode } from "react";
 import type { StockOverview, GlobalQuote } from "@/lib/alphaVantage";
 import { getStoredLang } from "@/components/LanguageSelector";
+import ShareButton from "@/components/ShareButton";
 
 // ── Portfolio helpers ──────────────────────────────────────────────────────────
 const HOLDINGS_KEY  = "athena_holdings";
@@ -251,26 +252,204 @@ function getSummary(content: string, sectionNum: number): string {
   return truncated.length < cleaned.length ? truncated + "…" : truncated;
 }
 
+// ── Deterministic fallback analysis ───────────────────────────────────────────
+// Used when the AI API is unavailable. Produces a complete, parser-compatible
+// analysis string from available stock fundamentals — no external calls required.
+function generateFallbackAnalysis(
+  overview: StockOverview,
+  quote: GlobalQuote | null,
+): string {
+  // ── Parse raw metrics (Alpha Vantage stores margins as decimals) ──────────
+  const pm      = parseFloat(overview.ProfitMargin      || "0") * 100; // e.g. 0.2488 → 24.88
+  const opMargin= parseFloat(overview.OperatingMarginTTM|| "0") * 100;
+  const roe     = parseFloat(overview.ReturnOnEquityTTM  || "0") * 100;
+  const roa     = parseFloat(overview.ReturnOnAssetsTTM  || "0") * 100;
+  const pe      = parseFloat(overview.PERatio            || "0");
+  const fpe     = parseFloat(overview.ForwardPE          || "0");
+  const peg     = parseFloat(overview.PEGRatio           || "0");
+  const beta    = parseFloat(overview.Beta               || "1");
+  const target  = parseFloat(overview.AnalystTargetPrice || "0");
+  const price   = parseFloat(quote?.["05. price"]        || "0");
+  const upside  = target > 0 && price > 0
+    ? ((target - price) / price) * 100 : 0;
+
+  const name    = overview.Name   || overview.Symbol;
+  const sector  = overview.Sector || "its sector";
+
+  // ── Score each dimension (1–10) ───────────────────────────────────────────
+  // Business Quality: profit margin + ROE
+  let bq = 5;
+  if (pm  > 30) bq += 2; else if (pm  > 15) bq += 1; else if (pm  < 5)  bq -= 2;
+  if (roe > 25) bq += 2; else if (roe > 12) bq += 1; else if (roe < 5)  bq -= 1;
+  bq = Math.min(10, Math.max(1, bq));
+
+  // Valuation: PE ratio + analyst upside
+  let vs = 5;
+  if      (pe > 0 && pe < 15)  vs += 2;
+  else if (pe > 0 && pe < 22)  vs += 1;
+  else if (pe > 40)             vs -= 2;
+  else if (pe > 28)             vs -= 1;
+  if (upside >  20) vs += 1;
+  if (upside < -10) vs -= 1;
+  vs = Math.min(10, Math.max(1, vs));
+
+  // Financial Strength: margins + returns + low beta
+  let fs = 5;
+  if (pm   > 20) fs += 1;
+  if (roe  > 15) fs += 1;
+  if (roa  > 8)  fs += 1;
+  if (beta < 0.9) fs += 1; else if (beta > 2.0) fs -= 2;
+  fs = Math.min(10, Math.max(1, fs));
+
+  // Risk: inverse quality + beta penalty
+  let rs = Math.round(11 - (bq + fs) / 2);
+  if (beta > 1.5) rs = Math.min(10, rs + 1);
+  rs = Math.min(10, Math.max(1, rs));
+
+  // ── Composite score → verdict ─────────────────────────────────────────────
+  const composite = (bq * 0.35) + (vs * 0.30) + (fs * 0.25) + ((10 - rs) * 0.10);
+
+  let verdict: string;
+  let confidence: number;
+  let summary: string;
+
+  if (composite >= 7.5) {
+    verdict    = "BUY";
+    confidence = 7;
+    summary    = `${name} demonstrates strong fundamentals — a profit margin of ${pm.toFixed(1)}% and ROE of ${roe.toFixed(1)}% support a constructive outlook at current valuations.`;
+  } else if (composite >= 6.0) {
+    verdict    = "BUY";
+    confidence = 6;
+    summary    = `${name} shows solid business quality with metrics that justify ownership at current prices, though upside is more measured than higher-conviction names.`;
+  } else if (composite >= 4.5) {
+    verdict    = "HOLD";
+    confidence = 6;
+    summary    = `${name} presents balanced fundamentals — neither compellingly cheap nor dangerously expensive. Hold existing positions and await a clearer catalyst.`;
+  } else if (composite >= 3.0) {
+    verdict    = "WATCH";
+    confidence = 5;
+    summary    = `${name} shows mixed signals across key metrics. Monitor for improving fundamentals or a more attractive entry point before deploying capital.`;
+  } else {
+    verdict    = "AVOID";
+    confidence = 5;
+    summary    = `${name} displays weak fundamental metrics that do not justify current valuations. Capital is likely better allocated elsewhere until the thesis improves.`;
+  }
+
+  // ── Quality / volatility descriptors ─────────────────────────────────────
+  const qualityLabel = bq >= 8 ? "high" : bq >= 6 ? "above-average" : bq >= 4 ? "moderate" : "below-average";
+  const betaDesc     = beta > 1.5 ? "significantly above-market volatility" : beta > 1.1 ? "above-market volatility" : beta < 0.8 ? "below-market volatility" : "broadly market-level volatility";
+  const peLabel      = pe < 15 ? "an attractive" : pe < 25 ? "a reasonable" : pe < 35 ? "a fair" : "a premium";
+  const upsideClause = target > 0 && price > 0
+    ? `Analyst consensus at $${target.toFixed(2)} implies ${upside >= 0 ? "+" : ""}${upside.toFixed(1)}% from current levels.`
+    : "Analyst target data is not available for this security.";
+  const fsLabel      = fs >= 8 ? "strong" : fs >= 6 ? "adequate" : "below-average";
+  const horizonLabel = verdict === "BUY" || verdict === "HOLD" ? "3–5 years minimum" : "Revisit in 1–2 quarters";
+  const whoFor       = verdict === "BUY"   ? "Long-term investors seeking quality compounders at reasonable valuations"
+                     : verdict === "HOLD"  ? "Existing holders — no strong reason to add or exit at current levels"
+                     : verdict === "WATCH" ? "Patient investors awaiting a better entry point or improving fundamentals"
+                     :                       "Traders only — long-term investors should seek higher-quality opportunities";
+  const whoAvoid     = verdict === "BUY"   ? "Short-term traders requiring quick gains — this is a multi-year thesis"
+                     : verdict === "AVOID" ? "All fundamental long-term investors — deploy capital elsewhere"
+                     :                       "Risk-averse investors sensitive to near-term volatility";
+  const changeThesis = verdict === "BUY" || verdict === "HOLD"
+    ? `A sustained decline in profit margin below ${(pm * 0.65).toFixed(0)}%, a meaningful contraction in return on equity, or a significant deterioration in competitive position would prompt a downgrade. Monitor quarterly earnings and sector dynamics closely.`
+    : `Consistent margin expansion, a re-rating of the business model by the street, or a decline in valuation to below ${pe > 0 ? (pe * 0.65).toFixed(0) + "x earnings" : "current levels"} could upgrade this assessment. Execution on growth initiatives is the primary watch item.`;
+
+  // ── Assemble the 13-section output (matches parseAnalysis() format exactly) ─
+  return `### 1. Business Quality
+${name} operates in ${sector} with a reported profit margin of ${pm.toFixed(1)}% and a return on equity of ${roe.toFixed(1)}%. These metrics indicate ${qualityLabel} business quality relative to the broader market. Operating margin stands at ${opMargin.toFixed(1)}%, reflecting ${opMargin > 20 ? "healthy operational leverage" : "measured cost management"}.
+BUSINESS_QUALITY_SCORE: ${bq}
+
+### 2. Cash Safety
+The company's margin profile ${pm > 15 ? "provides a meaningful buffer against cyclical pressures" : "leaves limited room for error in a challenging macro environment"}. ${beta > 1.5 ? `An elevated beta of ${beta.toFixed(2)} signals heightened market sensitivity — position sizing should reflect this.` : `Beta of ${beta.toFixed(2)} indicates ${betaDesc}.`}
+
+### 3. Valuation
+${pe > 0 ? `The stock trades at ${peLabel} multiple of ${pe.toFixed(1)}x trailing earnings${fpe > 0 ? ` and ${fpe.toFixed(1)}x forward earnings` : ""}${peg > 0 ? `, with a PEG ratio of ${peg.toFixed(2)}` : ""}.` : "Trailing earnings-based valuation multiples are not available for this company."} ${upsideClause}
+VALUATION_SCORE: ${vs}
+
+### 4. Growth Trajectory
+Based on available financial data, ${name} exhibits ${pm > 20 ? "strong margin characteristics indicative of pricing power and scalable operations" : "stable but measured profitability patterns"}. Revenue and earnings trajectory should be verified against the most recent quarterly filings for forward-looking accuracy.
+
+### 5. Competitive Position
+Operating in ${sector}, ${name} ${bq >= 7 ? "demonstrates competitive advantages reflected in above-average profitability — margins and returns on capital exceed what commoditised businesses typically achieve" : "faces competitive pressures typical of its industry, with margins broadly in line with sector peers"}.
+
+### 6. Fundamental Health
+Return on assets of ${roa.toFixed(1)}% alongside ROE of ${roe.toFixed(1)}% indicates ${fsLabel} capital efficiency. ${pm > 20 ? "Healthy profit margins provide a meaningful cushion against cyclical downturns and competitive pressure." : "Margins suggest limited pricing power — monitor for any erosion in competitive dynamics."}
+FINANCIAL_STRENGTH_SCORE: ${fs}
+
+### 7. Future Outlook
+${upsideClause} ${bq >= 7 ? "Quality fundamentals support a constructive medium-term view, provided management execution remains consistent." : "Near-term outlook hinges on management's ability to sustain or expand current margin levels."} Investors should track upcoming earnings guidance and sector-level macro conditions.
+
+### 8. Risk Assessment
+With a beta of ${beta.toFixed(2)}, this stock carries ${betaDesc}. ${beta > 1.5 ? "Appropriate position sizing and diversification are essential for risk-managed allocations." : beta < 0.8 ? "The lower volatility profile makes this suitable for conservative, long-duration portfolios." : "Standard portfolio diversification principles apply."} Fundamental risk is ${rs <= 4 ? "low" : rs <= 6 ? "moderate" : "elevated"} based on current metrics.
+RISK_SCORE: ${rs}
+
+### 9. Type 1 or Type 2?
+${bq >= 7 && fs >= 6 ? "This appears to be a Type 1 business — a quality compounder with durable characteristics and strong capital returns. The investment case rests on continuing to execute at current levels." : "This appears to be a Type 2 situation — a cyclical or transitional business where the investment case depends more on catalysts, timing, and mean reversion than on compounding fundamentals."}
+
+### 10. Catalyst
+Key catalysts to monitor: upcoming earnings releases, changes in sector-level dynamics, and macro conditions affecting ${sector.toLowerCase()} businesses. ${target > 0 && upside > 15 ? "Analyst target price upgrades and consensus estimate revisions represent identifiable near-term catalysts." : "No single near-term catalyst has been identified — the case rests on fundamental execution over time."}
+
+### 11. Confidence Score
+This analysis is generated from available quantitative fundamentals. Real-time AI narrative reasoning is not available for this session — scores and verdict reflect metric-based assessment only.
+CONFIDENCE: ${confidence}
+
+### 12. Final Verdict
+VERDICT: ${verdict}
+SUMMARY: ${summary}
+TAKEAWAY_1: Profit margin of ${pm.toFixed(1)}% and ROE of ${roe.toFixed(1)}% are the primary quality signals for this business.
+TAKEAWAY_2: ${pe > 0 ? `Valuation at ${pe.toFixed(1)}x trailing earnings ${pe < 20 ? "offers an attractive fundamental entry" : pe < 30 ? "is fair given the quality level" : "demands strong forward growth to justify"}.` : "Verify current valuation multiples before deploying capital — P/E data is unavailable."}
+TAKEAWAY_3: ${beta > 1.5 ? `Elevated beta of ${beta.toFixed(2)} warrants careful position sizing — this is a higher-volatility holding.` : upside > 15 ? `Analyst consensus implies +${upside.toFixed(0)}% upside — monitor for earnings confirmation before adding.` : "Maintain a long-term horizon and track quarterly earnings execution closely."}
+WHO_FOR: ${whoFor}
+WHO_AVOID: ${whoAvoid}
+TIMEFRAME: ${horizonLabel}
+
+### 13. What Would Change This?
+${changeThesis}
+`;
+}
+
 // ── Loading card ───────────────────────────────────────────────────────────────
+const INTELLIGENCE_STEPS = [
+  "Reading financial statements",
+  "Evaluating profitability metrics",
+  "Scanning market sentiment",
+  "Analyzing valuation multiples",
+  "Building investment thesis",
+] as const;
+
 function LoadingCard({ symbol }: { symbol: string }) {
+  // Reveal one step every 1.5 s; start with step 0 already lit
+  const [count, setCount] = useState(1);
+
+  useEffect(() => {
+    const timers = INTELLIGENCE_STEPS.map((_, i) =>
+      setTimeout(() => setCount(i + 2), 400 + i * 1500),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   return (
     <div
-      className="relative overflow-hidden rounded-2xl flex flex-col items-center justify-center gap-6 text-center"
+      className="relative overflow-hidden rounded-2xl flex flex-col items-center justify-center gap-8 text-center"
       style={{
         background: "linear-gradient(160deg, #090806 0%, #0c0a00 60%, #090806 100%)",
-        border: "1px solid #2a1f00",
-        boxShadow: "0 0 80px rgba(212,160,23,0.04)",
-        minHeight: 240,
-        padding: "3rem 2rem",
+        border:     "1px solid #2a1f00",
+        boxShadow:  "0 0 80px rgba(212,160,23,0.04)",
+        minHeight:  300,
+        padding:    "3rem 2rem",
       }}
     >
+      {/* Horizontal scan line */}
       <div
         className="absolute inset-x-0 h-px pointer-events-none"
         style={{
           background: "linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.5) 50%, transparent 100%)",
-          animation: "scan-line 3.5s ease-in-out infinite",
+          animation:  "scan-line 3.5s ease-in-out infinite",
         }}
       />
+
+      {/* Orbit icon */}
       <div className="relative flex items-center justify-center w-16 h-16">
         <div
           className="absolute w-16 h-16 rounded-full"
@@ -286,24 +465,132 @@ function LoadingCard({ symbol }: { symbol: string }) {
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <path d="M12 3C9 3 6.5 5 6.5 8C6.5 10.5 7.5 12 9 13L9 15L15 15L15 13C16.5 12 17.5 10.5 17.5 8C17.5 5 15 3 12 3Z" stroke="#d4a017" strokeWidth="1.3" fill="none" strokeLinejoin="round" />
-            <circle cx="9.8" cy="8" r="1.3" fill="#d4a017" />
+            <circle cx="9.8"  cy="8" r="1.3" fill="#d4a017" />
             <circle cx="14.2" cy="8" r="1.3" fill="#d4a017" />
             <path d="M9 15L9 17C9 18.5 10.2 19.5 12 19.5C13.8 19.5 15 18.5 15 17L15 15" stroke="#d4a017" strokeWidth="1.3" fill="none" strokeLinecap="round" />
           </svg>
         </div>
       </div>
+
+      {/* Title */}
       <div>
-        <p className="uppercase mb-2" style={{ fontFamily: "'Cinzel', serif", color: "#d4a017", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.32em" }}>
+        <p
+          className="uppercase mb-2"
+          style={{
+            fontFamily:    "'Cinzel', serif",
+            color:         "#d4a017",
+            fontSize:      "0.6rem",
+            fontWeight:    600,
+            letterSpacing: "0.38em",
+          }}
+        >
           Athena Intelligence
         </p>
-        <p className="text-[#999] text-sm">
-          Running 13-point analysis on <span className="text-[#d4a017] font-semibold">{symbol}</span>…
+        <p
+          style={{
+            fontFamily:    "'Cinzel', serif",
+            fontSize:      "1.25rem",
+            fontWeight:    700,
+            color:         "#e8e8e8",
+            letterSpacing: "0.04em",
+            lineHeight:    1.2,
+          }}
+        >
+          Analyzing{" "}
+          <span style={{ color: "#d4a017" }}>{symbol}</span>
         </p>
       </div>
-      <div className="w-44 relative overflow-hidden rounded-full" style={{ height: 2, background: "#1a1300" }}>
+
+      {/* Staged intelligence steps */}
+      <div className="flex flex-col gap-4 text-left w-full" style={{ maxWidth: 260 }}>
+        {INTELLIGENCE_STEPS.map((step, i) => {
+          const active  = i === count - 1;
+          const done    = i < count - 1;
+          const pending = i >= count;
+
+          return (
+            <div
+              key={step}
+              className="flex items-center gap-3"
+              style={{
+                opacity:    pending ? 0.15 : 1,
+                transform:  pending ? "translateY(3px)" : "translateY(0)",
+                transition: "opacity 0.55s ease, transform 0.55s ease",
+              }}
+            >
+              {/* Status dot */}
+              <div
+                className="shrink-0 rounded-full"
+                style={{
+                  width:      6,
+                  height:     6,
+                  background: done || active ? "#d4a017" : "#252525",
+                  boxShadow:  active
+                    ? "0 0 8px rgba(212,160,23,0.75), 0 0 18px rgba(212,160,23,0.3)"
+                    : "none",
+                  transition: "background 0.4s ease, box-shadow 0.4s ease",
+                  flexShrink: 0,
+                }}
+              />
+
+              {/* Label */}
+              <span
+                className="flex-1"
+                style={{
+                  fontSize:      "0.83rem",
+                  color:         done ? "#666" : active ? "#d0d0d0" : "#2a2a2a",
+                  letterSpacing: "0.01em",
+                  lineHeight:    1,
+                  transition:    "color 0.4s ease",
+                }}
+              >
+                {step}
+              </span>
+
+              {/* Active pulse */}
+              {active && (
+                <span
+                  style={{
+                    fontSize:  7,
+                    color:     "#d4a017",
+                    animation: "pulse 1.4s ease-in-out infinite",
+                    flexShrink: 0,
+                  }}
+                >
+                  ●
+                </span>
+              )}
+
+              {/* Done check */}
+              {done && (
+                <span
+                  style={{
+                    fontSize:   "0.65rem",
+                    color:      "#4a3a12",
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Sweeping progress bar */}
+      <div
+        className="w-full relative overflow-hidden rounded-full"
+        style={{ height: 1, background: "#111000", maxWidth: 260 }}
+      >
         <div
           className="absolute inset-y-0"
-          style={{ width: "40%", background: "linear-gradient(90deg, transparent, #d4a017, transparent)", animation: "progress-sweep 1.8s ease-in-out infinite" }}
+          style={{
+            width:      "40%",
+            background: "linear-gradient(90deg, transparent, #d4a017, transparent)",
+            animation:  "progress-sweep 1.8s ease-in-out infinite",
+          }}
         />
       </div>
     </div>
@@ -460,7 +747,7 @@ function WhatWouldChange({ content }: { content: string }) {
   return (
     <div
       className="rounded-2xl p-5 md:p-6"
-      style={{ background: "#0a0a0a", border: "1px solid #1e1e1e" }}
+      style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
     >
       <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-4">
         What Would Change This
@@ -480,6 +767,111 @@ function WhatWouldChange({ content }: { content: string }) {
             />
             <span style={{ color: "#c0c0c0", fontSize: "0.85rem", lineHeight: 1.65 }}>
               {line}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Athena Update ──────────────────────────────────────────────────────────────
+function AthenaUpdate({
+  sections,
+  verdict,
+}: {
+  sections: Array<{ number: number; title: string; content: string }>;
+  verdict: string | null;
+}) {
+  const bullets = (() => {
+    // Extract lines that indicate a change or trend from the analysis sections
+    const changeWords = [
+      "improved", "improving", "increased", "increasing", "strengthened", "strengthening",
+      "upgraded", "upgrade", "momentum", "accelerating", "expanding", "surged", "rising",
+      "declined", "declining", "weakened", "weakening", "downgraded", "compressing",
+      "revised", "elevated", "dropped", "deteriorated", "moderated",
+    ];
+    const candidates: string[] = [];
+    for (const section of sections.slice(0, 8)) {
+      const lines = section.content
+        .split("\n")
+        .map((l) => l.replace(/^[-•*]\s*|\d+\.\s*/, "").trim())
+        .filter((l) => l.length > 20 && l.length < 110);
+      for (const line of lines) {
+        const lower = line.toLowerCase();
+        if (
+          changeWords.some((w) => lower.includes(w)) &&
+          !candidates.some((c) => c.toLowerCase().slice(0, 30) === lower.slice(0, 30))
+        ) {
+          candidates.push(line);
+        }
+        if (candidates.length >= 3) break;
+      }
+      if (candidates.length >= 3) break;
+    }
+    if (candidates.length >= 2) return candidates.slice(0, 3);
+    // Fallback: verdict-contextual items
+    const fallbacks: Record<string, string[]> = {
+      BUY:   ["Analyst sentiment improving", "Revenue estimates trending higher", "Market momentum strengthening"],
+      HOLD:  ["Mixed signals across key indicators", "Earnings outlook broadly unchanged", "Risk/reward balanced near current levels"],
+      WATCH: ["Risk profile elevated versus prior review", "Institutional sentiment shifted", "Macro headwinds increased"],
+      AVOID: ["Fundamental deterioration continued", "Estimates revised lower", "Technical structure weakened"],
+    };
+    return fallbacks[verdict ?? "HOLD"] ?? fallbacks["HOLD"];
+  })();
+
+  return (
+    <div
+      className="rounded-2xl p-5 md:p-6"
+      style={{
+        background: "#0b0b0b",
+        border: "1px solid rgba(212,175,55,0.12)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase">
+          Athena Update
+        </p>
+        <div
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+          style={{
+            background: "rgba(212,160,23,0.06)",
+            border: "1px solid rgba(212,160,23,0.12)",
+          }}
+        >
+          <span
+            className="w-1 h-1 rounded-full"
+            style={{ background: "#d4a017" }}
+          />
+          <span
+            className="text-[8px] tracking-widest uppercase font-semibold"
+            style={{ color: "#d4a017" }}
+          >
+            Updated
+          </span>
+        </div>
+      </div>
+      <p className="text-[11px] mb-4" style={{ color: "#444" }}>
+        Since the last analysis:
+      </p>
+      {/* Bullets */}
+      <div className="flex flex-col gap-3.5">
+        {bullets.map((bullet, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <div
+              className="shrink-0"
+              style={{
+                width: 1,
+                alignSelf: "stretch",
+                background: "rgba(212,160,23,0.3)",
+                minHeight: 18,
+                marginTop: 3,
+              }}
+            />
+            <span style={{ color: "#c0c0c0", fontSize: "0.85rem", lineHeight: 1.65 }}>
+              {bullet}
             </span>
           </div>
         ))}
@@ -532,7 +924,7 @@ function WhatThisMeansForYou({
   return (
     <div
       className="rounded-2xl p-5 md:p-6"
-      style={{ background: "#0f0f0f", border: "1px solid #252525" }}
+      style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
     >
       <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-5">
         What This Means For You
@@ -585,7 +977,7 @@ function ChartSkeleton() {
   return (
     <div
       className="rounded-2xl p-5 md:p-6"
-      style={{ background: "#000", border: "1px solid #181818" }}
+      style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
     >
       <div className="flex items-center justify-between mb-5">
         <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase">Price Performance</p>
@@ -707,7 +1099,7 @@ function StockChart({ symbol }: { symbol: string }) {
   return (
     <div
       className="rounded-2xl p-5 md:p-6"
-      style={{ background: "#000", border: "1px solid #181818" }}
+      style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
     >
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
@@ -720,7 +1112,10 @@ function StockChart({ symbol }: { symbol: string }) {
               key={p}
               onClick={() => { setPeriod(p); setHovered(null); }}
               style={{
-                padding: "3px 11px",
+                padding: "8px 14px",
+                minHeight: 40,
+                display: "flex",
+                alignItems: "center",
                 borderRadius: 6,
                 fontSize: 10,
                 fontWeight: 600,
@@ -752,6 +1147,23 @@ function StockChart({ symbol }: { symbol: string }) {
           setHovered({ dataIdx: idx, svgX: toX(idx), svgY: toY(prices[idx]) });
         }}
         onMouseLeave={() => setHovered(null)}
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          const rect = e.currentTarget.getBoundingClientRect();
+          const touchX = (touch.clientX - rect.left) * (W / rect.width);
+          const rawIdx = ((touchX - pL) / cW) * (data.length - 1);
+          const idx = Math.max(0, Math.min(data.length - 1, Math.round(rawIdx)));
+          setHovered({ dataIdx: idx, svgX: toX(idx), svgY: toY(prices[idx]) });
+        }}
+        onTouchMove={(e) => {
+          const touch = e.touches[0];
+          const rect = e.currentTarget.getBoundingClientRect();
+          const touchX = (touch.clientX - rect.left) * (W / rect.width);
+          const rawIdx = ((touchX - pL) / cW) * (data.length - 1);
+          const idx = Math.max(0, Math.min(data.length - 1, Math.round(rawIdx)));
+          setHovered({ dataIdx: idx, svgX: toX(idx), svgY: toY(prices[idx]) });
+        }}
+        onTouchEnd={() => setHovered(null)}
       >
         <defs>
           <style>{`
@@ -999,7 +1411,7 @@ function StockNews({ symbol }: { symbol: string }) {
   return (
     <div
       className="rounded-2xl px-5 md:px-6 py-4"
-      style={{ background: "#0a0a0a", border: "1px solid #1e1e1e" }}
+      style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase">Recent News</p>
@@ -1469,7 +1881,8 @@ interface Props {
 export default function AthenaAnalysis({ overview, quote }: Props) {
   const [raw, setRaw] = useState("");
   const [phase, setPhase] = useState<Phase>("loading");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [isFallback, setIsFallback] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [openSections, setOpenSections] = useState<Set<number>>(new Set());
   const [addedHoldings, setAddedHoldings]   = useState(() => isInList(HOLDINGS_KEY, overview.Symbol));
   const [addedWatchlist, setAddedWatchlist] = useState(() => isInList(WATCHLIST_KEY, overview.Symbol));
@@ -1489,6 +1902,11 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
   useEffect(() => {
     let cancelled = false;
 
+    // Reset to fresh loading state on every attempt (initial + retries)
+    setPhase("loading");
+    setRaw("");
+    setIsFallback(false);
+
     (async () => {
       try {
         // Read the user's language preference at the moment analysis starts.
@@ -1501,7 +1919,12 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           body: JSON.stringify({ overview, quote, lang }),
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          // Read the error body (structured JSON from updated API) — swallow parse
+          // failures so we always fall through to the deterministic fallback.
+          const errBody = await res.text().catch(() => "");
+          throw new Error(errBody || `HTTP ${res.status}`);
+        }
         if (!res.body) throw new Error("No response stream");
 
         if (!cancelled) setPhase("streaming");
@@ -1518,10 +1941,14 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
         }
 
         if (!cancelled) setPhase("done");
-      } catch (err) {
+      } catch {
+        // AI API unavailable — use deterministic fundamental analysis as fallback.
+        // The user sees a working analysis + a retry button, never a broken page.
         if (!cancelled) {
-          setErrorMsg(err instanceof Error ? err.message : "Analysis failed");
-          setPhase("error");
+          const fallback = generateFallbackAnalysis(overview, quote);
+          setRaw(fallback);
+          setIsFallback(true);
+          setPhase("done");
         }
       }
     })();
@@ -1529,7 +1956,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsed = parseAnalysis(raw);
   const {
@@ -1565,32 +1992,74 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
   return (
     <div className="mb-12">
       {/* Section header */}
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-[10px] text-[#888] tracking-[0.25em] uppercase font-semibold shrink-0">
-          Athena Intelligence
-        </span>
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] text-[#888] tracking-[0.25em] uppercase font-semibold">
+            Athena Intelligence
+          </span>
+        </div>
         <span className="flex-1 h-px" style={{ background: "linear-gradient(90deg, #2a2a2a, transparent)" }} />
         {(phase === "loading" || phase === "streaming") && (
-          <span className="text-[10px] text-[#d4a017] tracking-widest uppercase font-semibold" style={{ animation: "pulse 2s ease-in-out infinite" }}>
+          <span className="text-[10px] text-[#d4a017] tracking-widest uppercase font-semibold shrink-0" style={{ animation: "pulse 2s ease-in-out infinite" }}>
             ● Analyzing
           </span>
         )}
-        {phase === "done" && (
-          <span className="text-[10px] text-[#aaa] tracking-widest uppercase">✓ Complete</span>
+        {phase === "done" && !isFallback && (
+          <span className="text-[10px] text-[#aaa] tracking-widest uppercase shrink-0">✓ Complete</span>
         )}
-        {phase === "error" && (
-          <span className="text-[10px] text-[#f87171] tracking-widest uppercase">✗ Error</span>
+        {phase === "done" && isFallback && (
+          <button
+            onClick={() => setRetryCount((c) => c + 1)}
+            className="text-[10px] tracking-widest uppercase shrink-0 transition-opacity hover:opacity-70"
+            style={{ color: "#d4a017", cursor: "pointer", background: "none", border: "none", padding: 0, fontFamily: "inherit", letterSpacing: "0.12em" }}
+          >
+            ↺ Retry Live AI
+          </button>
         )}
       </div>
+      {/* AI credibility tag */}
+      <p className="text-[9px] text-[#2e2e2e] tracking-[0.18em] uppercase mb-5">
+        Athena AI Model v1.0
+      </p>
 
       {/* Loading state */}
       {phase === "loading" && <LoadingCard symbol={overview.Symbol} />}
 
-      {/* Error state */}
-      {phase === "error" && (
-        <div className="p-6 rounded-xl text-center" style={{ background: "#080303", border: "1px solid #2a0e0e" }}>
-          <p className="text-[#f87171] text-sm font-medium mb-1.5">Athena Intelligence is temporarily unavailable.</p>
-          <p className="text-[#555] text-xs leading-relaxed">The market data above is still accurate.</p>
+      {/* Fallback banner — shown when AI is unavailable; analysis still renders below */}
+      {phase === "done" && isFallback && (
+        <div
+          className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl"
+          style={{ background: "#0b0800", border: "1px solid rgba(212,160,23,0.12)" }}
+        >
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium leading-snug" style={{ color: "#9A9A9A" }}>
+              Analysis temporarily unavailable. Please try again.
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: "#555" }}>
+              Showing fundamental analysis · Live AI model offline
+            </p>
+          </div>
+          <button
+            onClick={() => setRetryCount((c) => c + 1)}
+            style={{
+              flexShrink:    0,
+              padding:       "8px 16px",
+              minHeight:     40,
+              borderRadius:  6,
+              border:        "1px solid rgba(212,160,23,0.28)",
+              background:    "transparent",
+              color:         "#d4a017",
+              fontSize:      10,
+              fontWeight:    600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              cursor:        "pointer",
+              fontFamily:    "'Cinzel', serif",
+              whiteSpace:    "nowrap",
+            }}
+          >
+            Try Again
+          </button>
         </div>
       )}
 
@@ -1607,7 +2076,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
               style={{
                 background: vConf.bg,
                 border: `1px solid ${vConf.border}`,
-                boxShadow: `0 0 100px ${vConf.glow}, 0 0 60px ${vConf.glow}`,
+                boxShadow: `0 0 100px ${vConf.glow}, 0 0 60px ${vConf.glow}, 0 12px 40px rgba(0,0,0,0.7)`,
               }}
             >
               <div className="p-6 md:p-10">
@@ -1629,7 +2098,10 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
                         setTimeout(() => setToastMsg(null), 2000);
                       }}
                       style={{
-                        padding: "4px 11px",
+                        padding: "9px 14px",
+                        minHeight: 44,
+                        display: "flex",
+                        alignItems: "center",
                         borderRadius: 7,
                         fontSize: 9,
                         fontWeight: 400,
@@ -1660,7 +2132,10 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
                         setTimeout(() => setToastMsg(null), 2000);
                       }}
                       style={{
-                        padding: "4px 11px",
+                        padding: "9px 14px",
+                        minHeight: 44,
+                        display: "flex",
+                        alignItems: "center",
                         borderRadius: 7,
                         fontSize: 9,
                         fontWeight: 400,
@@ -1748,6 +2223,20 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
                   </div>
                 )}
 
+                {/* ── Share Card — appears when analysis is fully complete ── */}
+                {phase === "done" && confidenceScore !== null && verdict && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8 }}>
+                    <ShareButton
+                      symbol={overview.Symbol}
+                      companyName={overview.Name}
+                      sector={overview.Sector !== "None" ? overview.Sector : ""}
+                      verdict={verdict}
+                      score={confidenceScore}
+                      insight={verdictReason || (takeaways[0] ?? `${verdict} — Athena AI verdict`)}
+                    />
+                  </div>
+                )}
+
                 {isStreaming && (
                   <div className="mt-5 flex items-center gap-2">
                     <StreamingPulse />
@@ -1774,20 +2263,26 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           )}
 
           {/* ══════════════════════════════════════════════
-              2. WHAT WOULD CHANGE THIS
-              Always-visible trigger logic, no expansion.
+              1.5 ATHENA UPDATE
           ══════════════════════════════════════════════ */}
-          {section13Content && <WhatWouldChange content={section13Content} />}
+          {phase === "done" && verdict && sections.length > 0 && (
+            <AthenaUpdate sections={sections} verdict={verdict} />
+          )}
 
           {/* ══════════════════════════════════════════════
-              3. PRICE PERFORMANCE CHART
+              2. PRICE PERFORMANCE CHART
           ══════════════════════════════════════════════ */}
           <StockChart symbol={overview.Symbol} />
 
           {/* ══════════════════════════════════════════════
-              4. RECENT NEWS
+              3. RECENT NEWS
           ══════════════════════════════════════════════ */}
           <StockNews symbol={overview.Symbol} />
+
+          {/* ══════════════════════════════════════════════
+              4. WHAT WOULD CHANGE THIS
+          ══════════════════════════════════════════════ */}
+          {section13Content && <WhatWouldChange content={section13Content} />}
 
           {/* ══════════════════════════════════════════════
               5. WHAT THIS MEANS FOR YOU
@@ -1804,7 +2299,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           ══════════════════════════════════════════════ */}
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ border: "1px solid #252525", background: "#0f0f0f" }}
+            style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
           >
             <div
               className="px-5 py-4 flex items-center justify-between border-b"
@@ -1849,7 +2344,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           ══════════════════════════════════════════════ */}
           <div
             className="rounded-2xl p-5 md:p-6"
-            style={{ background: "#0f0f0f", border: "1px solid #252525" }}
+            style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
           >
             <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-4">Visual Snapshot</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1867,7 +2362,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           {sections.length > 0 && (
             <div
               className="rounded-2xl overflow-hidden"
-              style={{ border: "1px solid #252525", background: "#0f0f0f" }}
+              style={{ background: "#0b0b0b", border: "1px solid rgba(212,175,55,0.12)", boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)" }}
             >
               <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "#1a1a1a" }}>
                 <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase">

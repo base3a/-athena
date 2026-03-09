@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { searchStocks, type Stock } from "@/lib/stockList";
+import WatchlistIntelligence from "@/components/WatchlistIntelligence";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Verdict = "BUY" | "HOLD" | "WATCH" | "AVOID";
@@ -828,6 +829,13 @@ export default function PortfolioClient() {
   const removeFromHoldings  = useCallback((sym: string) => removeStock(sym, setHoldings),  [removeStock]);
   const removeFromWatchlist = useCallback((sym: string) => removeStock(sym, setWatchlist), [removeStock]);
 
+  // Intelligence symbols: watchlist first, then holdings, hard-cap at 5
+  const intelSymbols = useMemo(() => {
+    const wl = watchlist.map((s) => s.symbol);
+    const h  = holdings.map((s) => s.symbol).filter((sym) => !wl.includes(sym));
+    return [...wl, ...h].slice(0, 5);
+  }, [watchlist, holdings]);
+
   // ── Pre-hydration skeleton ──────────────────────────────────────────────────
   if (!mounted) {
     return (
@@ -864,6 +872,20 @@ export default function PortfolioClient() {
         <OverviewBar holdings={holdings} watchlist={watchlist} />
       ) : (
         <GlobalEmptyHero />
+      )}
+
+      {/* ── Watchlist Intelligence — shown when there are stocks to monitor ── */}
+      {intelSymbols.length > 0 && (
+        <>
+          <WatchlistIntelligence symbols={intelSymbols} />
+          <div
+            className="h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, #222 0%, #2a2a2a 30%, transparent 100%)",
+            }}
+          />
+        </>
       )}
 
       {/* ── Holdings ── */}

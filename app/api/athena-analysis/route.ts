@@ -146,46 +146,114 @@ TIMEFRAME: [One plain sentence. Is this better for long-term buy-and-hold invest
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  // ── 1. Parse and validate request body ──────────────────────────────────────
+  let overview: StockOverview;
+  let quote: GlobalQuote | null;
+  let safeLang: string;
+
   try {
-    const body = await req.json();
-    const { overview, quote, lang } = body as {
-      overview: StockOverview;
-      quote: GlobalQuote | null;
+    const body = await req.json() as {
+      overview?: StockOverview;
+      quote?: GlobalQuote | null;
       lang?: string;
     };
-    // Validate — only "en" and "sv" are supported; default to "en"
-    const safeLang = lang === "sv" ? "sv" : "en";
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return new Response("ANTHROPIC_API_KEY is not configured", { status: 500 });
+    if (!body?.overview?.Symbol) {
+      console.error("[athena-analysis] Invalid request: missing overview.Symbol");
+      return Response.json(
+        { status: "error", message: "Missing required stock data", fallback: true },
+        { status: 400 },
+      );
     }
 
-    const client = new Anthropic({ apiKey });
+    overview = body.overview;
+    quote    = body.quote ?? null;
+    safeLang = body.lang === "sv" ? "sv" : "en";
+  } catch {
+    console.error("[athena-analysis] Failed to parse request body");
+    return Response.json(
+      { status: "error", message: "Invalid request format", fallback: true },
+      { status: 400 },
+    );
+  }
 
-    const stream = client.messages.stream({
+  // ── 2. Verify API key ────────────────────────────────────────────────────────
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error("[athena-analysis] ANTHROPIC_API_KEY is not configured");
+    return Response.json(
+      { status: "error", message: "Analysis temporarily unavailable", fallback: true },
+      { status: 503 },
+    );
+  }
+
+  // ── 3. Stream the AI analysis ────────────────────────────────────────────────
+  try {
+    const client = new Anthropic({ apiKey });
+    const encoder = new TextEncoder();
+
+    const msgStream = client.messages.stream({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 3000,
       messages: [{ role: "user", content: buildPrompt(overview, quote, safeLang) }],
     });
 
-    const encoder = new TextEncoder();
+    // ── Pre-validate: consume events until the first text chunk arrives BEFORE
+    // returning a streaming Response to Next.js. Any Anthropic 4xx error (e.g.
+    // insufficient credits) throws here so we can return structured JSON instead
+    // of triggering "⨯ Error: failed to pipe response" in server logs.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const iter = (msgStream as any)[Symbol.asyncIterator]() as AsyncIterator<{
+      type: string;
+      delta?: { type: string; text?: string };
+    }>;
+    const preBuf: Uint8Array[] = [];
+
+    try {
+      for (;;) {
+        const { value: ev, done } = await iter.next();
+        if (done) break;
+        if (
+          ev.type === "content_block_delta" &&
+          ev.delta?.type === "text_delta" &&
+          ev.delta.text
+        ) {
+          preBuf.push(encoder.encode(ev.delta.text));
+          break; // one confirmed chunk is enough — stream is live
+        }
+      }
+    } catch (preErr) {
+      const msg = preErr instanceof Error ? preErr.message : "Upstream error";
+      console.error(`[athena-analysis] Anthropic rejected stream for ${overview.Symbol}:`, msg);
+      return Response.json(
+        { status: "error", message: "Analysis temporarily unavailable", fallback: true },
+        { status: 500 },
+      );
+    }
+
+    // Stream is live — pipe pre-buffered chunk + remaining events to client
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          // SDK v0.78 exposes raw SSE events via Symbol.asyncIterator
-          for await (const event of stream) {
+          // Flush the pre-validated chunk
+          for (const chunk of preBuf) controller.enqueue(chunk);
+          // Continue consuming the same stateful iterator
+          for (;;) {
+            const { value: ev, done } = await iter.next();
+            if (done) break;
             if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
+              ev.type === "content_block_delta" &&
+              ev.delta?.type === "text_delta" &&
+              ev.delta.text
             ) {
-              controller.enqueue(encoder.encode(event.delta.text));
+              controller.enqueue(encoder.encode(ev.delta.text));
             }
           }
-        } catch (err) {
-          controller.error(err);
-        } finally {
           controller.close();
+        } catch (streamErr) {
+          const msg = streamErr instanceof Error ? streamErr.message : "Stream error";
+          console.error(`[athena-analysis] Mid-stream error for ${overview.Symbol}:`, msg);
+          controller.error(streamErr);
         }
       },
     });
@@ -198,10 +266,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[athena-analysis]", err);
-    return new Response(
-      err instanceof Error ? err.message : "Analysis failed",
-      { status: 500 }
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[athena-analysis] API error for ${overview.Symbol}:`, msg);
+    return Response.json(
+      { status: "error", message: "Analysis temporarily unavailable", fallback: true },
+      { status: 500 },
     );
   }
 }

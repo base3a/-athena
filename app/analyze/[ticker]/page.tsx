@@ -4,6 +4,7 @@ import { fetchStockData, fmt, type StockOverview, type GlobalQuote } from "@/lib
 import TickerInput from "@/components/TickerInput";
 import AthenaAnalysis from "@/components/AthenaAnalysis";
 import LanguageSelector from "@/components/LanguageSelector";
+import MobileNav from "@/components/MobileNav";
 
 // ── Metadata ──────────────────────────────────────────────────────────────
 export async function generateMetadata({
@@ -115,7 +116,7 @@ export default async function AnalyzePage({
       />
 
       {/* ── Header ── */}
-      <header className="relative z-10 flex items-center gap-6 px-8 py-4 border-b border-[#1a1a1a]">
+      <header className="relative z-10 flex items-center gap-4 md:gap-6 px-4 md:px-8 py-4 border-b border-[#1a1a1a]">
         <Link
           href="/"
           className="shrink-0 text-gold-gradient font-bold tracking-widest hover:opacity-80 transition-opacity"
@@ -130,11 +131,11 @@ export default async function AnalyzePage({
         </div>
 
         {/* Language selector + Portfolio + Home — grouped on the right */}
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-3 md:gap-4">
           <LanguageSelector />
           <Link
             href="/portfolio"
-            className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
+            className="hidden sm:block text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
           >
             Portfolio
           </Link>
@@ -144,19 +145,20 @@ export default async function AnalyzePage({
           >
             ← Home
           </Link>
+          <MobileNav />
         </div>
       </header>
 
       {/* ── Main ── */}
-      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-6 md:px-12 py-10">
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 md:px-12 py-6 md:py-10">
 
         {/* Company identity + live price */}
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-14 pb-14 border-b border-[#161616]">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8 pb-8 border-b border-[#161616]">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1
                 className="text-white font-bold tracking-wider"
-                style={{ fontFamily: "'Cinzel', serif", fontSize: "2.4rem", lineHeight: 1 }}
+                style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(1.6rem, 5vw, 2.4rem)", lineHeight: 1 }}
               >
                 {overview.Symbol}
               </h1>
@@ -182,15 +184,15 @@ export default async function AnalyzePage({
             </div>
             <p className="text-[#e8e8e8] text-xl font-normal mb-2">{overview.Name}</p>
             <p className="text-[#888] text-[11px] tracking-widest uppercase">
-              {overview.Sector !== "None" ? overview.Sector : ""}
-              {overview.Sector !== "None" && overview.Industry !== "None" ? " • " : ""}
-              {overview.Industry !== "None" ? overview.Industry : ""}
+              {(overview.Sector && overview.Sector !== "None") ? overview.Sector : ""}
+              {(overview.Sector && overview.Sector !== "None") && (overview.Industry && overview.Industry !== "None") ? " • " : ""}
+              {(overview.Industry && overview.Industry !== "None") ? overview.Industry : ""}
             </p>
           </div>
 
           {price && (
             <div className="md:text-right">
-              <p className="text-white font-bold mb-1" style={{ fontSize: "2.6rem", lineHeight: 1 }}>
+              <p className="text-white font-bold mb-1" style={{ fontSize: "clamp(1.9rem, 6vw, 2.6rem)", lineHeight: 1 }}>
                 ${parseFloat(price).toFixed(2)}
                 <span className="text-[#777] text-sm font-normal ml-1">{overview.Currency}</span>
               </p>
@@ -215,7 +217,7 @@ export default async function AnalyzePage({
 
         {/* ── Key metrics grid ── */}
         <SectionLabel>Key Metrics</SectionLabel>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-16">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           <MetricCard label="Revenue TTM"   value={fmt(overview.RevenueTTM, "large")} />
           <MetricCard label="Profit Margin" value={fmt(overview.ProfitMargin, "percent")} />
           <MetricCard label="EPS (TTM)"     value={fmt(overview.EPS, "currency")} />
