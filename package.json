@@ -3,16 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "predev": "mkdir -p .next/dev/server/app/_not-found '.next/dev/server/app/analyze/[ticker]' '.next/dev/server/app/[ticker]' .next/dev/server/app/disclaimer .next/dev/server/app/markets .next/dev/server/app/portfolio .next/dev/server/app/privacy .next/dev/server/app/research '.next/dev/server/app/research/[slug]' .next/dev/server/app/screener .next/dev/server/app/terms .next/dev/server/app/api/athena-analysis .next/dev/server/app/api/early-access .next/dev/server/app/api/market-news .next/dev/server/app/api/portfolio-stock .next/dev/server/app/api/stock-chart .next/dev/server/app/api/stock-news .next/dev/server/app/api/watchlist-intelligence .next/dev/server/pages .next/dev/server/chunks .next/dev/server/vendor-chunks .next/dev/static/development .next/dev/static/chunks .next/dev/static/css .next/dev/static/media .next/dev/cache/webpack/client-development .next/dev/cache/webpack/client-development-fallback .next/dev/cache/webpack/server-development .next/cache/fetch-cache",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@vercel/analytics": "^2.0.1",
+    "googleapis": "^171.4.0",
     "next": "^16.1.6",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "yahoo-finance2": "^3.13.2"
   },
   "devDependencies": {
     "@types/node": "^20",

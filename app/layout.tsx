@@ -133,6 +133,8 @@ const jsonLd = {
 
 // ── Root layout ────────────────────────────────────────────────────────────
 import SiteFooter from "@/components/SiteFooter";
+import FeedbackButton from "@/components/FeedbackButton";
+import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
   children,
@@ -159,6 +161,8 @@ export default function RootLayout({
           {children}
           <SiteFooter />
         </div>
+        <FeedbackButton />
+        <Analytics />
       </body>
     </html>
   );

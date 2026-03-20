@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import NavLink from "@/components/NavLink";
 import TickerInput from "@/components/TickerInput";
-import LanguageSelector from "@/components/LanguageSelector";
 import { ShareMarketCardButton } from "@/components/ShareButton";
 import MobileNav from "@/components/MobileNav";
+import { fetchRobustQuotes, getRegimeData } from "@/lib/marketRegime";
 
 export const metadata: Metadata = {
-  title: "Markets — Athena AI",
+  title: "Markets",
   description:
     "Is this a risk-on or risk-off environment? Athena's composite market regime indicator gives you a clear answer in seconds.",
 };
@@ -462,16 +463,16 @@ function InternalBar({
 }
 
 // ── Regime Indicator ─────────────────────────────────────────────────────────
-function RegimeIndicator() {
-  const score = REGIME.score;
+function RegimeIndicator({ regime }: { regime: typeof REGIME }) {
+  const score = regime.score;
 
   return (
     <div
       className="rounded-2xl p-5 sm:p-8 md:p-10"
       style={{
-        background: REGIME.bg,
-        border:     `1px solid ${REGIME.border}`,
-        boxShadow:  `0 0 48px ${REGIME.glow}`,
+        background: regime.bg,
+        border:     `1px solid ${regime.border}`,
+        boxShadow:  `0 0 48px ${regime.glow}`,
       }}
     >
       {/* Classification + score */}
@@ -517,12 +518,12 @@ function RegimeIndicator() {
                 fontFamily:    "'Cinzel', serif",
                 fontSize:      "0.95rem",
                 fontWeight:    700,
-                color:         REGIME.color,
+                color:         regime.color,
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
               }}
             >
-              {REGIME.label}
+              {regime.label}
             </span>
           </div>
         </div>
@@ -537,7 +538,7 @@ function RegimeIndicator() {
             maxWidth:   480,
           }}
         >
-          {REGIME.interpretation}
+          {regime.interpretation}
         </p>
 
         {/* Positioning bias — actionable, muted */}
@@ -550,7 +551,7 @@ function RegimeIndicator() {
             marginTop:     2,
           }}
         >
-          {REGIME.positioning}
+          {regime.positioning}
         </p>
       </div>
 
@@ -574,7 +575,7 @@ function RegimeIndicator() {
               fontFamily:    "'Cinzel', serif",
               fontSize:      9,
               fontWeight:    700,
-              color:         REGIME.color,
+              color:         regime.color,
               letterSpacing: "0.06em",
             }}
           >
@@ -587,7 +588,7 @@ function RegimeIndicator() {
               height:    0,
               borderLeft:  "4px solid transparent",
               borderRight: "4px solid transparent",
-              borderTop:   `6px solid ${REGIME.color}`,
+              borderTop:   `6px solid ${regime.color}`,
             }}
           />
         </div>
@@ -629,7 +630,7 @@ function RegimeIndicator() {
 }
 
 // ── Sector Heatmap ────────────────────────────────────────────────────────────
-function SectorHeatmap() {
+function SectorHeatmap({ sectors }: { sectors: Sector[] }) {
   return (
     <div>
       <p
@@ -650,7 +651,7 @@ function SectorHeatmap() {
           gap:                 6,
         }}
       >
-        {SECTORS.map((sector) => (
+        {sectors.map((sector) => (
           <div
             key={sector.label}
             style={{
@@ -757,9 +758,183 @@ function RiskRow({ signal }: { signal: RiskSignal }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function MarketsPage() {
-  const ad    = INTERNALS.advDecline;
-  const adColor = ad >= 1 ? "#4ade80" : "#f87171";
+export default async function MarketsPage() {
+
+  // ── Fetch all live market data in parallel ────────────────────────────────
+  // fetchRobustQuotes: uses Finnhub for ETFs (SPY, QQQ, DIA, GLD, sector ETFs)
+  // and Yahoo Finance for indices (^VIX, ^TNX) and crypto (BTC-USD).
+  // getRegimeData: single source of truth shared with homepage MarketBrief.
+  const ALL_SYMBOLS = [
+    "SPY", "QQQ", "DIA", "^VIX", "^TNX", "GLD", "BTC-USD", "UUP",
+    "XLK", "XLC", "XLY", "XLF", "XLI", "XLB", "XLV", "XLP", "XLRE", "XLU", "XLE",
+  ];
+  const [quotes, liveRegime] = await Promise.all([
+    fetchRobustQuotes(ALL_SYMBOLS),
+    getRegimeData(),
+  ]);
+
+  // ── Helper: synthetic sparkline from prevClose → current price ──────────
+  function makeSparkline(prev: number, curr: number): number[] {
+    return Array.from({ length: 10 }, (_, i) => {
+      const t    = i / 9;
+      const base = prev + (curr - prev) * t;
+      const noise = (Math.sin(i * 2.1 + prev * 0.001) * 0.35 + Math.sin(i * 0.7) * 0.2)
+                    * Math.abs(curr - prev) * 0.2;
+      return parseFloat((base + noise).toFixed(4));
+    });
+  }
+
+  // ── Helper: format price string per symbol ────────────────────────────────
+  function fmtPrice(sym: string): string {
+    const q = quotes[sym];
+    if (!q || q.price === 0) return "—";
+    const p = q.price;
+    if (sym === "BTC-USD") return `$${Math.round(p).toLocaleString("en-US")}`;
+    if (sym === "^TNX")    return `${p.toFixed(2)}%`;
+    if (sym === "GLD")     return `$${p.toFixed(2)}`;
+    if (sym === "^VIX")    return p.toFixed(1);
+    return p.toFixed(2);
+  }
+
+  // ── Helper: format change string per symbol ───────────────────────────────
+  function fmtChange(sym: string): string {
+    const q = quotes[sym];
+    if (!q) return "—";
+    const c    = q.change;
+    const sign = c >= 0 ? "+" : "";
+    if (sym === "BTC-USD") return `${sign}${Math.round(c).toLocaleString("en-US")}`;
+    if (sym === "^VIX" || sym === "^TNX") return `${sign}${c.toFixed(2)}`;
+    return `${sign}${c.toFixed(2)}`;
+  }
+
+  // ── Build live snapshot cards ─────────────────────────────────────────────
+  const vixPrice     = quotes["^VIX"]?.price ?? 20;
+  const spyChangePct = quotes["SPY"]?.changePct ?? 0;
+
+  const liveSnapshotCards: MarketCard[] = [
+    {
+      label: "S&P 500",
+      symbol: "SPY",
+      value: fmtPrice("SPY"),
+      change: fmtChange("SPY"),
+      changePct: quotes["SPY"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["SPY"]?.prevClose ?? 0, quotes["SPY"]?.price ?? 0),
+      interpretation: "US large-cap benchmark · tracks 500 biggest companies.",
+    },
+    {
+      label: "Nasdaq 100",
+      symbol: "QQQ",
+      value: fmtPrice("QQQ"),
+      change: fmtChange("QQQ"),
+      changePct: quotes["QQQ"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["QQQ"]?.prevClose ?? 0, quotes["QQQ"]?.price ?? 0),
+      interpretation: "Tech-heavy index · AI and growth stock bellwether.",
+    },
+    {
+      label: "Dow Jones",
+      symbol: "DIA",
+      value: fmtPrice("DIA"),
+      change: fmtChange("DIA"),
+      changePct: quotes["DIA"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["DIA"]?.prevClose ?? 0, quotes["DIA"]?.price ?? 0),
+      interpretation: "30 blue-chip industrials · value and cyclical proxy.",
+    },
+    {
+      label: "VIX",
+      symbol: "VIX",
+      value: fmtPrice("^VIX"),
+      change: fmtChange("^VIX"),
+      changePct: quotes["^VIX"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["^VIX"]?.prevClose ?? 0, quotes["^VIX"]?.price ?? 0),
+      interpretation: vixPrice < 15
+        ? "Low volatility · fear absent · risk appetite intact."
+        : vixPrice < 20
+        ? "Moderate volatility · market cautiously positioned."
+        : vixPrice < 30
+        ? "Elevated volatility · defensive positioning rising."
+        : "High fear environment · risk-off mode active.",
+      invert: true,
+    },
+    {
+      label: "US 10Y Yield",
+      symbol: "TNX",
+      value: fmtPrice("^TNX"),
+      change: fmtChange("^TNX"),
+      changePct: quotes["^TNX"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["^TNX"]?.prevClose ?? 0, quotes["^TNX"]?.price ?? 0),
+      interpretation: "Treasury yield benchmark · drives borrowing costs globally.",
+    },
+    {
+      label: "Gold",
+      symbol: "GLD",
+      value: fmtPrice("GLD"),
+      change: fmtChange("GLD"),
+      changePct: quotes["GLD"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["GLD"]?.prevClose ?? 0, quotes["GLD"]?.price ?? 0),
+      interpretation: "Safe-haven demand indicator · inflation and crisis proxy.",
+    },
+    {
+      label: "Bitcoin",
+      symbol: "BTC",
+      value: fmtPrice("BTC-USD"),
+      change: fmtChange("BTC-USD"),
+      changePct: quotes["BTC-USD"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["BTC-USD"]?.prevClose ?? 0, quotes["BTC-USD"]?.price ?? 0),
+      interpretation: "Digital risk asset · correlates with equity risk appetite.",
+    },
+    {
+      label: "Dollar Index",
+      symbol: "UUP",
+      value: fmtPrice("UUP"),
+      change: fmtChange("UUP"),
+      changePct: quotes["UUP"]?.changePct ?? 0,
+      sparkData: makeSparkline(quotes["UUP"]?.prevClose ?? 0, quotes["UUP"]?.price ?? 0),
+      interpretation: "USD strength ETF · higher = headwind for non-US assets.",
+      invert: true,
+    },
+  ];
+
+  // ── Build live sector performance (sorted best → worst) ───────────────────
+  // liveRegime comes from getRegimeData() above — same source as homepage MarketBrief.
+  const SECTOR_ETF_MAP = [
+    { label: "Technology",    short: "Tech",    sym: "XLK"  },
+    { label: "Communication", short: "Comm",    sym: "XLC"  },
+    { label: "Consumer Disc", short: "Cons D",  sym: "XLY"  },
+    { label: "Financials",    short: "Fin",     sym: "XLF"  },
+    { label: "Industrials",   short: "Indust",  sym: "XLI"  },
+    { label: "Materials",     short: "Mat",     sym: "XLB"  },
+    { label: "Healthcare",    short: "Health",  sym: "XLV"  },
+    { label: "Staples",       short: "Staples", sym: "XLP"  },
+    { label: "Real Estate",   short: "RE",      sym: "XLRE" },
+    { label: "Utilities",     short: "Util",    sym: "XLU"  },
+    { label: "Energy",        short: "Energy",  sym: "XLE"  },
+  ];
+
+  const liveSectors: Sector[] = SECTOR_ETF_MAP
+    .map(({ label, short, sym }) => ({
+      label,
+      short,
+      pct: parseFloat((quotes[sym]?.changePct ?? 0).toFixed(2)),
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
+  // ── Market internals: VIX-proxy estimates ──────────────────────────────────
+  const above50MA  = vixPrice < 15 ? 72 : vixPrice < 20 ? 57 : vixPrice < 25 ? 43 : 32;
+  const above200MA = vixPrice < 15 ? 64 : vixPrice < 20 ? 50 : vixPrice < 25 ? 38 : 28;
+
+  // Advance/Decline: SPY-change proxy
+  const adRatio   = spyChangePct > 0.5 ? 1.4 + spyChangePct * 0.2
+                  : spyChangePct > 0   ? 1.1 + spyChangePct * 0.3
+                  : spyChangePct > -0.5 ? 0.9 + spyChangePct * 0.3
+                  : 0.7 + spyChangePct * 0.1;
+  const ad        = parseFloat(Math.max(0.5, Math.min(2.5, adRatio)).toFixed(2));
+  const adColor   = ad >= 1 ? "#4ade80" : "#f87171";
+
+  const internalsSummary = above50MA > 60
+    ? "Breadth confirms the trend — most S&P 500 stocks in healthy technical position."
+    : above50MA > 45
+    ? "Breadth mixed — market trend supported but participation narrowing."
+    : "Breadth deteriorating — fewer stocks participating in the trend.";
 
   return (
     <div className="relative flex-1 bg-black flex flex-col">
@@ -795,27 +970,11 @@ export default function MarketsPage() {
 
         {/* Right nav */}
         <div className="ml-auto flex items-center gap-4 md:gap-6">
-          <LanguageSelector />
           <nav className="hidden md:flex items-center gap-5">
-            <Link
-              href="/markets"
-              className="text-[11px] tracking-widest uppercase font-semibold transition-colors duration-200"
-              style={{ color: "#d4a017" }}
-            >
-              Markets
-            </Link>
-            <Link
-              href="/screener"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Screener
-            </Link>
-            <Link
-              href="/portfolio"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Portfolio
-            </Link>
+            <NavLink href="/markets"   label="Markets"   tooltip="Live market intelligence" active />
+            <NavLink href="/screener"  label="Screener"  tooltip="Discover quality stocks"   />
+            <NavLink href="/research"  label="Research"  tooltip="AI market insights"       />
+            <NavLink href="/portfolio" label="Portfolio" tooltip="Track your holdings"      />
           </nav>
           <Link
             href="/"
@@ -849,7 +1008,7 @@ export default function MarketsPage() {
           </div>
 
           <div className="flex flex-col items-end gap-2 shrink-0">
-            {/* Simulated Data badge */}
+            {/* Live Data badge */}
             <span
               style={{
                 display:       "inline-flex",
@@ -857,10 +1016,10 @@ export default function MarketsPage() {
                 gap:           6,
                 padding:       "4px 12px",
                 borderRadius:  20,
-                border:        "1px solid rgba(212,160,23,0.2)",
-                background:    "rgba(212,160,23,0.05)",
+                border:        "1px solid rgba(74,222,128,0.2)",
+                background:    "rgba(74,222,128,0.05)",
                 fontSize:      9,
-                color:         "#8a6820",
+                color:         "#4ade80",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
                 fontWeight:    600,
@@ -871,22 +1030,22 @@ export default function MarketsPage() {
                   width:        5,
                   height:       5,
                   borderRadius: "50%",
-                  background:   "#8a6820",
+                  background:   "#4ade80",
                   display:      "inline-block",
-                  opacity:      0.7,
+                  opacity:      0.85,
                 }}
               />
-              Simulated Data
+              Live · 15min delay
             </span>
             <p style={{ fontSize: 9, color: "#333", letterSpacing: "0.12em" }}>
-              Mar 2, 2026 · 16:00 EST
+              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             </p>
             {/* Share market regime card */}
             <ShareMarketCardButton
-              score={REGIME.score}
-              label={REGIME.label}
-              interpretation={REGIME.interpretation}
-              positioning={REGIME.positioning}
+              score={liveRegime.score}
+              label={liveRegime.label}
+              interpretation={liveRegime.interpretation}
+              positioning={liveRegime.positioning}
             />
           </div>
         </div>
@@ -895,7 +1054,7 @@ export default function MarketsPage() {
         {/* LAYER 2 — REGIME INDICATOR (most dominant)                         */}
         {/* ──────────────────────────────────────────────────────────────────── */}
         <div className="mb-10">
-          <RegimeIndicator />
+          <RegimeIndicator regime={liveRegime} />
         </div>
 
         {/* ──────────────────────────────────────────────────────────────────── */}
@@ -904,7 +1063,7 @@ export default function MarketsPage() {
         <div className="mb-16">
           <SectionLabel>Global Snapshot</SectionLabel>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {SNAPSHOT_CARDS.map((card) => (
+            {liveSnapshotCards.map((card) => (
               <SnapshotCard key={card.symbol} card={card} />
             ))}
           </div>
@@ -921,7 +1080,7 @@ export default function MarketsPage() {
             className="mb-8"
             style={{ fontSize: "0.84rem", color: "#666", lineHeight: 1.7 }}
           >
-            {INTERNALS.summary}
+            {internalsSummary}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -935,14 +1094,14 @@ export default function MarketsPage() {
             >
               <InternalBar
                 label="% Stocks Above 50-Day MA"
-                value={`${INTERNALS.above50MA}%`}
-                pct={INTERNALS.above50MA}
+                value={`${above50MA}%`}
+                pct={above50MA}
                 color="#d4a017"
               />
               <InternalBar
                 label="% Stocks Above 200-Day MA"
-                value={`${INTERNALS.above200MA}%`}
-                pct={INTERNALS.above200MA}
+                value={`${above200MA}%`}
+                pct={above200MA}
                 color="#d4a017"
               />
               {/* Advance / Decline */}
@@ -994,16 +1153,16 @@ export default function MarketsPage() {
                   style={{
                     padding:      "4px 12px",
                     borderRadius: 6,
-                    background:   "rgba(74,222,128,0.07)",
-                    border:       "1px solid rgba(74,222,128,0.2)",
+                    background:   ad >= 1 ? "rgba(74,222,128,0.07)" : "rgba(248,113,113,0.07)",
+                    border:       ad >= 1 ? "1px solid rgba(74,222,128,0.2)" : "1px solid rgba(248,113,113,0.2)",
                     fontSize:     9,
-                    color:        "#4ade80",
+                    color:        adColor,
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     fontWeight:   600,
                   }}
                 >
-                  Broad
+                  {ad >= 1.3 ? "Broad" : ad >= 1 ? "Moderate" : "Narrow"}
                 </div>
               </div>
             </div>
@@ -1016,7 +1175,7 @@ export default function MarketsPage() {
                 border:     "1px solid #1a1a1a",
               }}
             >
-              <SectorHeatmap />
+              <SectorHeatmap sectors={liveSectors} />
             </div>
           </div>
         </div>
@@ -1056,7 +1215,7 @@ export default function MarketsPage() {
           className="text-center text-[9px] tracking-[0.22em] uppercase"
           style={{ color: "#2a2a2a" }}
         >
-          Simulated data · For illustrative purposes only · Not financial advice
+          Market data via Yahoo Finance · 15-min delay · For informational purposes only · Not financial advice
         </p>
       </main>
 

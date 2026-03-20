@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import NavLink from "@/components/NavLink";
 import TickerInput from "@/components/TickerInput";
-import LanguageSelector from "@/components/LanguageSelector";
 import ScreenerClient from "@/components/ScreenerClient";
 
 export const metadata: Metadata = {
-  title: "Screener — Athena AI",
+  title: "Screener",
   description:
     "Discover quality stocks for long-term investors. Filter by ROE, margins, growth, and more. Athena's quality-first stock screener.",
 };
@@ -45,27 +45,11 @@ export default function ScreenerPage() {
 
         {/* Right nav */}
         <div className="ml-auto flex items-center gap-6">
-          <LanguageSelector />
           <nav className="hidden md:flex items-center gap-5">
-            <Link
-              href="/markets"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Markets
-            </Link>
-            <Link
-              href="/screener"
-              className="text-[11px] tracking-widest uppercase font-semibold transition-colors duration-200"
-              style={{ color: "#d4a017" }}
-            >
-              Screener
-            </Link>
-            <Link
-              href="/portfolio"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Portfolio
-            </Link>
+            <NavLink href="/markets"   label="Markets"   tooltip="Live market intelligence" />
+            <NavLink href="/screener"  label="Screener"  tooltip="Discover quality stocks"   active />
+            <NavLink href="/research"  label="Research"  tooltip="AI market insights"       />
+            <NavLink href="/portfolio" label="Portfolio" tooltip="Track your holdings"      />
           </nav>
           <Link
             href="/"
@@ -89,11 +73,11 @@ export default function ScreenerPage() {
               Screener
             </h1>
             <p className="text-sm font-light" style={{ color: "#9A9A9A" }}>
-              Quality-first discovery for long-term investors.
+              Filter the market by fundamentals. Built for long-term investors.
             </p>
           </div>
 
-          {/* Simulated Data badge */}
+          {/* Live Data badge */}
           <span
             className="shrink-0"
             style={{
@@ -102,10 +86,10 @@ export default function ScreenerPage() {
               gap:           6,
               padding:       "4px 12px",
               borderRadius:  20,
-              border:        "1px solid rgba(212,160,23,0.2)",
-              background:    "rgba(212,160,23,0.05)",
+              border:        "1px solid rgba(74,222,128,0.2)",
+              background:    "rgba(74,222,128,0.05)",
               fontSize:      9,
-              color:         "#8a6820",
+              color:         "#4ade80",
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               fontWeight:    600,
@@ -114,10 +98,10 @@ export default function ScreenerPage() {
             <span
               style={{
                 width: 5, height: 5, borderRadius: "50%",
-                background: "#8a6820", display: "inline-block", opacity: 0.7,
+                background: "#4ade80", display: "inline-block", opacity: 0.8,
               }}
             />
-            Simulated Data
+            Live Data
           </span>
         </div>
 

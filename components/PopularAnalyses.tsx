@@ -2,28 +2,38 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { computeScore } from "@/lib/scoring";
+import type { ScoringResult } from "@/lib/scoring";
 
-const POPULAR = [
-  { ticker: "NVDA", verdict: "BUY" },
-  { ticker: "MSFT", verdict: "BUY" },
-  { ticker: "ASML", verdict: "BUY" },
-  { ticker: "LLY",  verdict: "HOLD" },
-  { ticker: "META", verdict: "BUY" },
+// Update these manually when market conditions change
+const POPULAR_METRICS = [
+  { ticker: "NVDA", pe: 44.2, roe: 91.4,  profitMargin: 53.4, revenueGrowth: 122.4, beta: 1.7 },
+  { ticker: "AAPL", pe: 29.4, roe: 147.2, profitMargin: 26.4, revenueGrowth:   2.8, beta: 1.2 },
+  { ticker: "TSLA", pe: 55.0, roe: 20.2,  profitMargin: 10.8, revenueGrowth:  13.4, beta: 2.0 },
+  { ticker: "MSFT", pe: 32.8, roe: 38.2,  profitMargin: 34.1, revenueGrowth:  15.7, beta: 0.9 },
+  { ticker: "ASML", pe: 36.2, roe: 42.8,  profitMargin: 26.4, revenueGrowth:  15.8, beta: 1.3 },
 ] as const;
 
-type Verdict = (typeof POPULAR)[number]["verdict"];
+// Derive verdict and score from the shared Athena formula
+const POPULAR = POPULAR_METRICS.map(({ ticker, ...metrics }) => ({
+  ticker,
+  ...computeScore(metrics),
+}));
+
+type Verdict = ScoringResult["verdict"];
 
 function verdictColor(verdict: Verdict): string {
-  if (verdict === "BUY")  return "#4ade80";
-  if (verdict === "HOLD") return "#d4a017";
-  return "#f87171"; // SELL / AVOID / WATCH
+  if (verdict === "BUY")   return "#4ade80";
+  if (verdict === "HOLD")  return "#d4a017";
+  if (verdict === "WATCH") return "#888888";
+  return "#f87171"; // AVOID
 }
 
 export default function PopularAnalyses() {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className="w-full max-w-xl md:max-w-[900px] mt-8">
+    <div className="w-full mt-8">
       <div
         style={{
           background: "#0b0b0b",

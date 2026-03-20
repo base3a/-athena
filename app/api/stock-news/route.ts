@@ -1,15 +1,12 @@
 import { NextRequest } from "next/server";
 import { InMemoryCache } from "@/lib/cache";
-
-const AV_KEY = process.env.ALPHA_VANTAGE_API_KEY ?? "";
-
-type NewsArticle = { title: string; url: string; source: string; time_published: string };
+import { fetchFinnhubNews, type NewsArticle } from "@/lib/finnhub";
 
 // Module-level cache — keyed by uppercase ticker, TTL = 5 min
 const newsCache = new InMemoryCache<NewsArticle[]>();
 
-// ── Dev fallback: generic market headlines when rate-limited ───────────────────
-const MOCK_ARTICLES = [
+// ── Dev fallback: generic market headlines when all sources are exhausted ──────
+const MOCK_ARTICLES: NewsArticle[] = [
   {
     title: "Markets steady as investors weigh macro data and earnings guidance",
     url: "https://finance.yahoo.com",
@@ -30,76 +27,95 @@ const MOCK_ARTICLES = [
   },
 ];
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Convert ISO 8601 timestamp to compact format "YYYYMMDDTHHMMSS"
+function isoToPublished(iso: string): string {
+  return iso.replace(/[-:]/g, "").replace(/Z$/, "").slice(0, 15);
+}
+
+// ── Source 1: NewsAPI ─────────────────────────────────────────────────────────
+async function fetchNewsAPI(symbol: string): Promise<NewsArticle[] | null> {
+  const key = process.env.NEWS_API_KEY;
+  if (!key) return null;
+
+  try {
+    const url =
+      `https://newsapi.org/v2/everything` +
+      `?q=${encodeURIComponent(symbol)}+stock` +
+      `&sortBy=publishedAt` +
+      `&pageSize=5` +
+      `&language=en` +
+      `&apiKey=${key}`;
+
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data.status !== "ok" || !Array.isArray(data.articles)) return null;
+
+    const articles: NewsArticle[] = (data.articles as Record<string, unknown>[])
+      .filter((a) => a.title && a.url && a.title !== "[Removed]")
+      .slice(0, 3)
+      .map((a) => ({
+        title:          String(a.title),
+        url:            String(a.url),
+        source:         String((a.source as Record<string, unknown>)?.name ?? "NewsAPI"),
+        time_published: isoToPublished(String(a.publishedAt ?? "")),
+      }));
+
+    return articles.length > 0 ? articles : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Route handler ─────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get("symbol") ?? "";
   if (!symbol) {
     return new Response(JSON.stringify({ error: "symbol required" }), { status: 400 });
   }
 
-  const key = symbol.toUpperCase();
+  const cacheKey = symbol.toUpperCase();
 
-  // Guard: if API key is not configured, return empty articles immediately
-  if (!AV_KEY) {
-    console.error("[stock-news] ALPHA_VANTAGE_API_KEY is not configured");
-    return new Response(
-      JSON.stringify({ status: "error", message: "API key not configured", articles: [] }),
-      { status: 503, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
-  // 1. In-memory cache hit → return immediately, no network call
-  const hit = newsCache.get(key);
+  // 1. In-memory cache hit
+  const hit = newsCache.get(cacheKey);
   if (hit) {
     return new Response(JSON.stringify({ articles: hit }), {
-      headers: { "Content-Type": "application/json", "Cache-Control": "s-maxage=300, stale-while-revalidate=60" },
-    });
-  }
-
-  try {
-    const url =
-      `https://www.alphavantage.co/query` +
-      `?function=NEWS_SENTIMENT` +
-      `&tickers=${encodeURIComponent(symbol)}` +
-      `&limit=3` +
-      `&apikey=${AV_KEY}`;
-
-    const res = await fetch(url, {
-      next: { revalidate: 300 }, // HTTP-level cache 5 min
-    });
-    const data = await res.json();
-
-    // Rate-limit guard
-    if (data.Note || data.Information) {
-      if (process.env.NODE_ENV === "development") {
-        return new Response(JSON.stringify({ articles: MOCK_ARTICLES }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ articles: [] }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const feed: Record<string, unknown>[] = Array.isArray(data.feed) ? data.feed : [];
-    const articles: NewsArticle[] = feed.slice(0, 3).map((item) => ({
-      title:          item.title          as string,
-      url:            item.url            as string,
-      source:         item.source         as string,
-      time_published: item.time_published as string,
-    }));
-
-    // 2. Store in cache before returning (only real articles, not empty/error)
-    if (articles.length > 0) newsCache.set(key, articles);
-
-    return new Response(JSON.stringify({ articles }), {
       headers: {
         "Content-Type":  "application/json",
         "Cache-Control": "s-maxage=300, stale-while-revalidate=60",
       },
     });
-  } catch {
-    return new Response(JSON.stringify({ articles: [] }), {
-      headers: { "Content-Type": "application/json" },
-    });
   }
+
+  // 2. NewsAPI (primary — requires NEWS_API_KEY)
+  let articles = await fetchNewsAPI(symbol);
+
+  // 3. Finnhub /company-news (fallback — uses FINNHUB_API_KEY, last 7 days)
+  if (!articles) {
+    articles = await fetchFinnhubNews(symbol);
+  }
+
+  // 4. Dev mock when both sources are unavailable
+  if (!articles) {
+    if (process.env.NODE_ENV === "development") {
+      articles = MOCK_ARTICLES;
+    } else {
+      articles = [];
+    }
+  }
+
+  // Cache real results (not the static mock list)
+  if (articles.length > 0 && articles !== MOCK_ARTICLES) {
+    newsCache.set(cacheKey, articles);
+  }
+
+  return new Response(JSON.stringify({ articles }), {
+    headers: {
+      "Content-Type":  "application/json",
+      "Cache-Control": "s-maxage=300, stale-while-revalidate=60",
+    },
+  });
 }

@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import TickerInput from "@/components/TickerInput";
-import LanguageSelector from "@/components/LanguageSelector";
 import PortfolioClient from "@/components/PortfolioClient";
 
 export const metadata: Metadata = {
-  title: "Portfolio — Athena AI",
+  title: "Portfolio",
   description:
     "Track your holdings and watchlist. AI-powered Athena verdicts update automatically when you add a stock.",
 };
@@ -39,7 +38,6 @@ export default function PortfolioPage() {
 
         {/* Right controls */}
         <div className="ml-auto flex items-center gap-6">
-          <LanguageSelector />
           <nav className="hidden md:flex items-center gap-5">
             <Link
               href="/markets"

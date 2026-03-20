@@ -7,6 +7,21 @@ const nextConfig: NextConfig = {
   // Strict mode catches potential issues during development
   reactStrictMode: true,
 
+  // Disable webpack's persistent cache in dev — prevents ENOENT errors on
+  // cold start after `rm -rf .next` (pack files written before dirs exist)
+  webpack(config, { dev }) {
+    if (dev) {
+      config.cache = false;
+    }
+    return config;
+  },
+
+  experimental: {
+    // Use the standard .next/ output path instead of .next/dev/
+    // This prevents cold-start ENOENT failures when .next is wiped
+    isolatedDevBuild: false,
+  },
+
   // Custom security and performance response headers applied to every route
   async headers() {
     return [

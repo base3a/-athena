@@ -2,32 +2,32 @@ import type { MetadataRoute } from "next";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://athenastocks.ai";
 
-// High-traffic tickers that benefit from pre-indexed pages
-const FEATURED_TICKERS = [
+const POPULAR_TICKERS = [
   "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN",
-  "TSLA", "META", "NFLX", "JPM", "V",
-  "WMT", "JNJ", "UNH", "XOM", "BRK.B",
-  "AMD", "INTC", "DIS", "BA", "SPOT",
+  "META", "TSLA", "LLY", "AVGO", "JPM",
+  "UNH", "V", "XOM", "MA", "ASML",
+  "PG", "JNJ", "HD", "MRK", "COST",
+  "ABBV", "NFLX", "BAC", "AMD", "WMT",
+  "INTC", "DIS", "BA", "SPOT", "BRK.B",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
-  return [
-    // ── Home ──────────────────────────────────────────────────────────────
-    {
-      url: SITE_URL,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 1,
-    },
-
-    // ── Featured stock analysis pages ─────────────────────────────────────
-    ...FEATURED_TICKERS.map((ticker) => ({
-      url: `${SITE_URL}/analyze/${ticker}`,
-      lastModified: now,
-      changeFrequency: "hourly" as const,
-      priority: 0.8,
-    })),
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: SITE_URL,                      lastModified: now, changeFrequency: "daily",  priority: 1.0 },
+    { url: `${SITE_URL}/markets`,         lastModified: now, changeFrequency: "daily",  priority: 0.8 },
+    { url: `${SITE_URL}/screener`,        lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${SITE_URL}/research`,        lastModified: now, changeFrequency: "daily",  priority: 0.7 },
+    { url: `${SITE_URL}/portfolio`,       lastModified: now, changeFrequency: "weekly", priority: 0.6 },
   ];
+
+  const stockPages: MetadataRoute.Sitemap = POPULAR_TICKERS.map((ticker) => ({
+    url: `${SITE_URL}/analyze/${ticker}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.9,
+  }));
+
+  return [...staticPages, ...stockPages];
 }

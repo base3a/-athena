@@ -9,7 +9,7 @@ const features = [
       </svg>
     ),
     title: "Technical Analysis",
-    description: "RSI, MACD, Bollinger Bands, moving averages, and pattern recognition across all timeframes.",
+    description: "RSI, MACD, Bollinger Bands, and moving average patterns across all major timeframes.",
   },
   {
     icon: (
@@ -20,7 +20,7 @@ const features = [
       </svg>
     ),
     title: "Fundamental Analysis",
-    description: "Deep-dive into earnings, P/E ratios, revenue growth, debt levels, and institutional holdings.",
+    description: "Earnings quality, P/E ratios, revenue growth, balance sheet strength, and institutional ownership.",
   },
   {
     icon: (
@@ -29,7 +29,7 @@ const features = [
       </svg>
     ),
     title: "Sentiment Analysis",
-    description: "Real-time news sentiment, analyst ratings aggregation, and social signal processing.",
+    description: "News sentiment tracking, analyst consensus aggregation, and market signal interpretation.",
   },
   {
     icon: (
@@ -39,13 +39,13 @@ const features = [
       </svg>
     ),
     title: "Risk Assessment",
-    description: "Volatility metrics, beta analysis, drawdown history, and tail-risk probability modeling.",
+    description: "Beta, volatility, maximum drawdown, and downside risk quantification.",
   },
 ];
 
 export default function FeatureCards() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-5xl">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
       {features.map((feature) => (
         <div
           key={feature.title}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "/markets",   label: "Markets"   },
@@ -14,6 +15,8 @@ const NAV_LINKS = [
 export default function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [tappedHref, setTappedHref] = useState<string | null>(null);
+  const pathname = usePathname();
 
   // Hydration guard — portal requires document.body
   useEffect(() => { setMounted(true); }, []);
@@ -118,49 +121,86 @@ export default function MobileNav() {
 
         {/* ── Nav links ── */}
         <nav role="navigation" aria-label="Mobile navigation" style={{ flex: 1 }}>
-          {NAV_LINKS.map((link, i) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={close}
-              style={{
-                display:        "flex",
-                alignItems:     "center",
-                justifyContent: "space-between",
-                height:         58,
-                paddingLeft:    24,
-                paddingRight:   20,
-                fontSize:       12,
-                fontFamily:     "'Cinzel', serif",
-                fontWeight:     600,
-                letterSpacing:  "0.2em",
-                textTransform:  "uppercase",
-                color:          "#888",
-                borderBottom:   i < NAV_LINKS.length - 1 ? "1px solid #111" : "none",
-                textDecoration: "none",
-                WebkitTapHighlightColor: "transparent",
-                transition:     "color 0.15s ease, background 0.15s ease",
-              }}
-              onTouchStart={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#d4a017";
-                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(212,160,23,0.04)";
-              }}
-              onTouchEnd={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#888";
-                (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-              }}
-            >
-              <span>{link.label}</span>
-              <svg
-                width="14" height="14" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round"
-                style={{ opacity: 0.25 }}
+          {NAV_LINKS.map((link, i) => {
+            const isActive = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={close}
+                style={{
+                  position:       "relative",
+                  display:        "flex",
+                  alignItems:     "center",
+                  justifyContent: "space-between",
+                  height:         58,
+                  paddingLeft:    24,
+                  paddingRight:   20,
+                  fontSize:       12,
+                  fontFamily:     "'Cinzel', serif",
+                  fontWeight:     600,
+                  letterSpacing:  "0.2em",
+                  textTransform:  "uppercase",
+                  color:          isActive ? "#d4a017" : "#888",
+                  borderBottom:   i < NAV_LINKS.length - 1 ? "1px solid #111" : "none",
+                  textDecoration: "none",
+                  WebkitTapHighlightColor: "transparent",
+                  transition:     "color 0.15s ease, background 0.15s ease",
+                  overflow:       "hidden",
+                }}
+                onTouchStart={(e) => {
+                  setTappedHref(link.href);
+                  (e.currentTarget as HTMLAnchorElement).style.color = "#d4a017";
+                  (e.currentTarget as HTMLAnchorElement).style.background = "rgba(212,160,23,0.04)";
+                }}
+                onTouchEnd={(e) => {
+                  setTimeout(() => setTappedHref(null), 350);
+                  (e.currentTarget as HTMLAnchorElement).style.color = isActive ? "#d4a017" : "#888";
+                  (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+                }}
               >
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </Link>
-          ))}
+                {/* Label — with gold dot when active */}
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width:        4,
+                        height:       4,
+                        borderRadius: "50%",
+                        background:   "#d4a017",
+                        flexShrink:   0,
+                      }}
+                    />
+                  )}
+                  {link.label}
+                </span>
+
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{ opacity: 0.25 }}
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+
+                {/* Gold underline — slides in from left on tap */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position:   "absolute",
+                    bottom:     0,
+                    left:       0,
+                    height:     1,
+                    background: "linear-gradient(to right, rgba(212,160,23,0.3), #d4a017, rgba(212,160,23,0.3))",
+                    width:      tappedHref === link.href ? "100%" : "0%",
+                    transition: "width 0.25s ease",
+                  }}
+                />
+              </Link>
+            );
+          })}
         </nav>
 
         {/* ── Bottom safe area ── */}

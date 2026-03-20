@@ -2256,6 +2256,25 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
                 style={{ background: "linear-gradient(90deg, transparent, rgba(212,160,23,0.3), transparent)", animation: "scan-line 3.5s ease-in-out infinite" }}
               />
               <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-6">Instant Decision</p>
+              {/* Animated "Athena is analyzing…" text */}
+              <p
+                className="text-sm font-medium mb-6 tracking-wide"
+                style={{ color: "#d4a017" }}
+              >
+                Athena is analyzing {overview.Symbol}
+                <span className="inline-flex gap-[3px] ml-1 align-middle">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="inline-block w-1 h-1 rounded-full"
+                      style={{
+                        background: "#d4a017",
+                        animation: `analyzing-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
+                      }}
+                    />
+                  ))}
+                </span>
+              </p>
               <div className="h-20 w-52 rounded-xl skeleton mb-5" />
               <div className="h-4 w-full max-w-sm rounded skeleton mb-2.5" />
               <div className="h-4 w-3/4 max-w-xs rounded skeleton" />

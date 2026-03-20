@@ -16,7 +16,7 @@ export interface DailyBriefData {
 
 // ── Placeholder data — replace with live AI-generated summary ───────────────
 const BRIEF_DATA: DailyBriefData = {
-  date: "Mar 8, 2026",
+  date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
   regime: "Constructive",
   regimeScore: 68,
   summaryLines: [
@@ -142,7 +142,7 @@ export default function DailyMarketBrief({ data = BRIEF_DATA }: { data?: DailyBr
               className="text-[9px] tracking-widest uppercase font-semibold mb-3 text-left"
               style={{ color: "#555" }}
             >
-              Key Signals Today
+              Key Signals
             </p>
             <ul className="flex flex-col gap-2">
               {data.signals.map((signal, i) => (

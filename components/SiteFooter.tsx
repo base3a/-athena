@@ -44,14 +44,18 @@ export default function SiteFooter() {
 
           {/* Right: legal links */}
           <div className="flex items-center gap-5 shrink-0">
-            {["Privacy", "Terms", "Disclaimer"].map((item) => (
-              <a
-                key={item}
-                href="#"
+            {[
+              { label: "Privacy",    href: "/privacy"    },
+              { label: "Terms",      href: "/terms"      },
+              { label: "Disclaimer", href: "/disclaimer" },
+            ].map(({ label, href }) => (
+              <Link
+                key={label}
+                href={href}
                 className="text-[11px] text-[#333] hover:text-[#555] tracking-widest uppercase transition-colors duration-200"
               >
-                {item}
-              </a>
+                {label}
+              </Link>
             ))}
           </div>
         </div>

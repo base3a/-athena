@@ -64,7 +64,33 @@ function buildFallbackInsight(score: number, overview: StockOverview): string {
   return "Risk profile elevated across key dimensions; position sizing critical.";
 }
 
-// ── Claude intelligence call with deterministic fallback ──────────────────────
+// ── Shared helper: DeepSeek non-streaming chat ────────────────────────────────
+async function deepSeekChat(prompt: string, maxTokens: number): Promise<string | null> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        max_tokens: maxTokens,
+        stream: false,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── AI intelligence call: DeepSeek → Anthropic → deterministic ───────────────
 async function getStockIntelligence(
   symbol: string,
 ): Promise<{ symbol: string; score: number | null; insight: string | null }> {
@@ -73,13 +99,7 @@ async function getStockIntelligence(
 
   const { overview } = result;
 
-  // Try Claude first — fall through to deterministic if key is missing or call fails
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
-    const client = new Anthropic({ apiKey });
-
-    const prompt = `You are Athena, an AI investment analyst.
+  const prompt = `You are Athena, an AI investment analyst.
 Given these fundamentals for ${symbol} (${overview.Name}, ${overview.Sector}):
 - P/E: ${overview.PERatio} | Forward P/E: ${overview.ForwardPE} | PEG: ${overview.PEGRatio}
 - Profit Margin: ${(parseFloat(overview.ProfitMargin || "0") * 100).toFixed(1)}%
@@ -91,6 +111,27 @@ Reply with ONLY this exact format (two lines, no extra text):
 SCORE: 8
 INSIGHT: One direct sentence under 15 words on the single most important current dynamic.`;
 
+  // ── Try DeepSeek first (primary) ──────────────────────────────────────────
+  try {
+    const text = await deepSeekChat(prompt, 60);
+    if (text) {
+      const scoreMatch   = text.match(/SCORE:\s*(\d+)/i);
+      const insightMatch = text.match(/INSIGHT:\s*(.+)/i);
+      const rawScore = scoreMatch ? parseInt(scoreMatch[1], 10) : null;
+      const score    = rawScore !== null && rawScore >= 1 && rawScore <= 10 ? rawScore : null;
+      const insight  = insightMatch ? insightMatch[1].trim() : null;
+      if (score !== null && insight) {
+        return { symbol, score, insight };
+      }
+    }
+  } catch { /* fall through */ }
+
+  // ── Try Anthropic (fallback) ──────────────────────────────────────────────
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+    const client = new Anthropic({ apiKey });
+
     const msg = await client.messages.create({
       model:      "claude-sonnet-4-5-20250929",
       max_tokens: 60,
@@ -101,20 +142,16 @@ INSIGHT: One direct sentence under 15 words on the single most important current
 
     const scoreMatch   = text.match(/SCORE:\s*(\d+)/i);
     const insightMatch = text.match(/INSIGHT:\s*(.+)/i);
-
     const rawScore = scoreMatch ? parseInt(scoreMatch[1], 10) : null;
     const score    = rawScore !== null && rawScore >= 1 && rawScore <= 10 ? rawScore : null;
     const insight  = insightMatch ? insightMatch[1].trim() : null;
 
-    // If Claude returned valid data, use it; else fall through to deterministic
     if (score !== null && insight) {
       return { symbol, score, insight };
     }
-  } catch {
-    // Fall through to deterministic
-  }
+  } catch { /* fall through to deterministic */ }
 
-  // Deterministic fallback — always returns meaningful data
+  // ── Deterministic fallback — always returns meaningful data ───────────────
   const score   = computeScore(overview);
   const insight = buildFallbackInsight(score, overview);
   return { symbol, score, insight };

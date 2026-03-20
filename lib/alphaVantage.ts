@@ -1,5 +1,6 @@
-import { getMockData } from "./mockData";
 import { InMemoryCache } from "./cache";
+import { fetchFinnhubStock } from "./finnhub";
+import { fetchYahooFundamentals, fetchYahooPrice, buildYahooOverview } from "./yahoo";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface StockOverview {
@@ -52,8 +53,21 @@ export interface GlobalQuote {
   "10. change percent": string;
 }
 
+export type PriceSource = "live" | "yahoo" | "delayed";
+
 export type FetchResult =
-  | { success: true; overview: StockOverview; quote: GlobalQuote | null; isMockData?: boolean }
+  | {
+      success: true;
+      overview: StockOverview;
+      quote: GlobalQuote | null;
+      isMockData?: boolean;
+      /**
+       * "live"    — Finnhub returned real-time data
+       * "yahoo"   — Finnhub unavailable; data rescued from Yahoo Finance
+       * "delayed" — Both sources failed; price unavailable
+       */
+      priceSource?: PriceSource;
+    }
   | { success: false; error: "rate_limited" | "invalid_ticker" | "network_error" };
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -73,7 +87,7 @@ export function fmt(
     case "currency":
       return `$${num.toFixed(2)}`;
     case "percent":
-      // AV sends decimals like 0.2631 → 26.31%
+      // Values stored as decimals (0.2631 → 26.31%)
       return `${(num * 100).toFixed(2)}%`;
     case "large":
       if (Math.abs(num) >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
@@ -88,65 +102,47 @@ export function fmt(
   }
 }
 
-// ── Fetcher ───────────────────────────────────────────────────────────────
-const BASE = "https://www.alphavantage.co/query";
-
+// ── Cache + dedup ──────────────────────────────────────────────────────────
 // Module-level cache — keyed by uppercase ticker, TTL = 5 min
 const stockCache = new InMemoryCache<FetchResult>();
 
 // Pending requests map — deduplicates concurrent calls for the same ticker.
-// If two callers ask for AAPL simultaneously and the cache is cold, only one
-// Alpha Vantage call runs; the second caller awaits the same Promise.
+// If two callers ask for AAPL simultaneously, only one network call runs.
 const pendingRequests = new Map<string, Promise<FetchResult>>();
 
-// ── Private: performs the actual Alpha Vantage fetch (no cache or dedup logic)
-async function _doFetch(ticker: string, key: string, apiKey: string): Promise<FetchResult> {
+// ── Private: performs the actual fetch (no cache or dedup logic) ───────────
+// Priority: Finnhub (real-time) → Yahoo Finance (full fundamentals + price)
+async function _doFetch(ticker: string, key: string): Promise<FetchResult> {
   try {
-    const [overviewRes, quoteRes] = await Promise.all([
-      fetch(
-        `${BASE}?function=OVERVIEW&symbol=${ticker}&apikey=${apiKey}`,
-        { next: { revalidate: 1800 } } // HTTP-level cache 30 min
-      ),
-      fetch(
-        `${BASE}?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`,
-        { next: { revalidate: 1800 } } // HTTP-level cache 30 min
-      ),
-    ]);
-
-    const [overview, quoteData] = await Promise.all([
-      overviewRes.json(),
-      quoteRes.json(),
-    ]);
-
-    // Rate limit / premium feature notice
-    if (overview.Note || overview.Information) {
-      // In development, transparently fall back to mock data if available
-      if (process.env.NODE_ENV === "development") {
-        const mock = getMockData(ticker);
-        if (mock) {
-          const result: FetchResult = { success: true, ...mock, isMockData: true };
-          stockCache.set(key, result);
-          return result;
-        }
-      }
-      return { success: false, error: "rate_limited" };
+    // ── 1. Finnhub (primary, real-time) ──────────────────────────────────
+    const finnhubResult = await fetchFinnhubStock(ticker);
+    if (finnhubResult) {
+      stockCache.set(key, finnhubResult);
+      return finnhubResult;
     }
 
-    // Invalid ticker or no data
-    if (overview["Error Message"] || !overview.Symbol) {
-      return { success: false, error: "invalid_ticker" };
+    // ── 2. Yahoo Finance (full fallback — fundamentals + price) ──────────
+    const [fundamentals, quote] = await Promise.all([
+      fetchYahooFundamentals(ticker),
+      fetchYahooPrice(ticker),
+    ]);
+
+    if (fundamentals) {
+      const overview = buildYahooOverview(ticker, fundamentals, quote);
+      const result: FetchResult = {
+        success: true,
+        overview,
+        quote,
+        priceSource: "yahoo",
+      };
+      stockCache.set(key, result);
+      return result;
     }
 
-    const quote: GlobalQuote | null =
-      quoteData["Global Quote"] &&
-      Object.keys(quoteData["Global Quote"]).length > 0
-        ? (quoteData["Global Quote"] as GlobalQuote)
-        : null;
-
-    const result: FetchResult = { success: true, overview, quote };
-    stockCache.set(key, result);
-    return result;
+    // Both sources returned no data without throwing — most likely an unknown ticker
+    return { success: false, error: "invalid_ticker" };
   } catch {
+    // True network / exception error
     return { success: false, error: "network_error" };
   }
 }
@@ -158,11 +154,9 @@ export async function fetchStockData(ticker: string): Promise<FetchResult> {
   const hit = stockCache.get(key);
   if (hit) return hit;
 
-  // 2. API key guard — fail fast before touching the network
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-  if (!apiKey) {
-    console.error("[alphaVantage] ALPHA_VANTAGE_API_KEY is not configured");
-    return { success: false, error: "rate_limited" };
+  // 2. Finnhub must be configured (Yahoo Finance requires no key)
+  if (!process.env.FINNHUB_API_KEY) {
+    console.error("[stock] FINNHUB_API_KEY is not configured — Yahoo-only fallback active");
   }
 
   // 3. Dedup: if a fetch is already in-flight for this ticker, share its Promise
@@ -170,7 +164,7 @@ export async function fetchStockData(ticker: string): Promise<FetchResult> {
   if (inflight) return inflight;
 
   // 4. Start the fetch, register it so concurrent callers can share it
-  const promise = _doFetch(ticker, key, apiKey);
+  const promise = _doFetch(ticker, key);
   pendingRequests.set(key, promise);
 
   try {

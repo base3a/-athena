@@ -2,19 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchStockData, type StockOverview } from "@/lib/alphaVantage";
 import Anthropic from "@anthropic-ai/sdk";
 
-// ── Mini verdict + confidence + summary via Claude ─────────────────────────────
+// ── Shared helper: DeepSeek non-streaming chat ────────────────────────────────
+async function deepSeekChat(prompt: string, maxTokens: number): Promise<string | null> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        max_tokens: maxTokens,
+        stream: false,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Mini verdict + confidence + summary: DeepSeek → Anthropic ─────────────────
 async function getMiniVerdict(
   symbol: string,
   overview: StockOverview
 ): Promise<{ verdict: string | null; confidence: number | null; summary: string | null }> {
-  // Guard: if key is missing return empty rather than crashing the route
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { verdict: null, confidence: null, summary: null };
+  const empty = { verdict: null, confidence: null, summary: null };
 
-  const client = new Anthropic({ apiKey });
-
-  try {
-    const prompt = `You are Athena, a precise AI investment analyst.
+  const prompt = `You are Athena, a precise AI investment analyst.
 Given these fundamentals for ${symbol} (${overview.Name}, ${overview.Exchange}):
 - Sector: ${overview.Sector}
 - P/E: ${overview.PERatio} | Forward P/E: ${overview.ForwardPE} | PEG: ${overview.PEGRatio}
@@ -29,6 +50,30 @@ VERDICT: BUY
 CONFIDENCE: 8
 SUMMARY: One direct sentence under 14 words capturing the single key risk or opportunity.`;
 
+  // ── Try DeepSeek first (primary) ──────────────────────────────────────────
+  try {
+    const text = await deepSeekChat(prompt, 80);
+    if (text) {
+      const verdictMatch    = text.match(/VERDICT:\s*(BUY|HOLD|WATCH|AVOID)/i);
+      const confidenceMatch = text.match(/CONFIDENCE:\s*(\d+)/i);
+      const summaryMatch    = text.match(/SUMMARY:\s*(.+)/i);
+      const verdict    = verdictMatch ? verdictMatch[1].toUpperCase() : null;
+      const rawConf    = confidenceMatch ? parseInt(confidenceMatch[1], 10) : null;
+      const confidence = rawConf !== null && rawConf >= 1 && rawConf <= 10 ? rawConf : null;
+      const summary    = summaryMatch ? summaryMatch[1].trim() : null;
+      if (verdict && confidence !== null && summary) {
+        return { verdict, confidence, summary };
+      }
+    }
+  } catch { /* fall through to Anthropic */ }
+
+  // ── Fall back to Anthropic ────────────────────────────────────────────────
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return empty;
+
+  const client = new Anthropic({ apiKey });
+
+  try {
     const msg = await client.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 80,
@@ -50,7 +95,7 @@ SUMMARY: One direct sentence under 14 words capturing the single key risk or opp
 
     return { verdict, confidence, summary };
   } catch {
-    return { verdict: null, confidence: null, summary: null };
+    return empty;
   }
 }
 

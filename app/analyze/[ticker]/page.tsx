@@ -1,9 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { fetchStockData, fmt, type StockOverview, type GlobalQuote } from "@/lib/alphaVantage";
-import TickerInput from "@/components/TickerInput";
+import TickerInput from "@/components/TickerInputNoSSR";
 import AthenaAnalysis from "@/components/AthenaAnalysis";
-import LanguageSelector from "@/components/LanguageSelector";
+import AnalysisGate from "@/components/AnalysisGate";
 import MobileNav from "@/components/MobileNav";
 
 // ── Metadata ──────────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ export async function generateMetadata({
   const { ticker } = await params;
   const symbol = ticker.toUpperCase();
 
-  // Pull company name from Alpha Vantage — uses Next.js fetch cache so no extra API calls
+  // Pull company name from Finnhub/Yahoo — uses Next.js fetch cache so no extra API calls
   let companyName = symbol;
   let sector: string | null = null;
   let industry: string | null = null;
@@ -32,17 +33,13 @@ export async function generateMetadata({
     // Fall back to ticker symbol only
   }
 
-  const sectorTag = sector ? ` · ${sector}` : "";
-  const industryTag = industry ? ` · ${industry}` : "";
-
-  const title = `${symbol} Stock Analysis — ${companyName}`;
+  // Use absolute to bypass the layout template (which would add "| Athena AI" again)
+  const title = `${symbol} Stock Analysis — AI Insights | Athena`;
   const description =
-    `AI-powered investment analysis for ${companyName} (${symbol})${sectorTag}${industryTag}. ` +
-    `Get real-time fundamental metrics, valuation assessment, risk analysis, and an AI investment ` +
-    `verdict powered by Claude. Is ${symbol} a Buy, Hold, or Avoid?`;
+    `AI-powered analysis of ${companyName} including fundamentals, sentiment, and market signals.`;
 
   return {
-    title,
+    title: { absolute: title },
     description,
     keywords: [
       `${symbol} stock analysis`,
@@ -55,14 +52,14 @@ export async function generateMetadata({
       "investment analysis AI",
     ],
     openGraph: {
-      title: `${symbol} — AI Stock Analysis | Athena`,
+      title,
       description,
       url: `/analyze/${symbol}`,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${symbol} Stock Analysis — Athena AI`,
+      title,
       description,
     },
     alternates: {
@@ -86,7 +83,7 @@ export default async function AnalyzePage({
     return <ErrorState error={result.error} symbol={symbol} />;
   }
 
-  const { overview, quote, isMockData } = result;
+  const { overview, quote, isMockData, priceSource } = result;
 
   // Price & change data
   const price = quote?.["05. price"] ?? null;
@@ -127,12 +124,13 @@ export default async function AnalyzePage({
 
         {/* Inline search bar */}
         <div className="flex-1 max-w-xs hidden md:block">
-          <TickerInput compact />
+          <Suspense fallback={null}>
+            <TickerInput compact />
+          </Suspense>
         </div>
 
-        {/* Language selector + Portfolio + Home — grouped on the right */}
+        {/* Portfolio + Home — grouped on the right */}
         <div className="ml-auto flex items-center gap-3 md:gap-4">
-          <LanguageSelector />
           <Link
             href="/portfolio"
             className="hidden sm:block text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
@@ -190,29 +188,49 @@ export default async function AnalyzePage({
             </p>
           </div>
 
-          {price && (
-            <div className="md:text-right">
-              <p className="text-white font-bold mb-1" style={{ fontSize: "clamp(1.9rem, 6vw, 2.6rem)", lineHeight: 1 }}>
-                ${parseFloat(price).toFixed(2)}
-                <span className="text-[#777] text-sm font-normal ml-1">{overview.Currency}</span>
-              </p>
-              {change && changePctRaw && (
-                <p
-                  className="text-lg font-semibold mb-1"
-                  style={{ color: isPositive ? "#4ade80" : "#f87171" }}
-                >
-                  {isPositive ? "▲" : "▼"}&nbsp;
-                  {Math.abs(parseFloat(change)).toFixed(2)}&nbsp;
-                  ({Math.abs(parseFloat(changePctRaw)).toFixed(2)}%)
+          <div className="md:text-right">
+            {price ? (
+              <>
+                <p className="text-white font-bold mb-1" style={{ fontSize: "clamp(1.9rem, 6vw, 2.6rem)", lineHeight: 1 }}>
+                  ${parseFloat(price).toFixed(2)}
+                  <span className="text-[#777] text-sm font-normal ml-1">{overview.Currency}</span>
                 </p>
-              )}
-              {lastDay && (
-                <p className="text-[#777] text-[11px] tracking-widest">
-                  As of {lastDay}
+                {change && changePctRaw && (
+                  <p
+                    className="text-lg font-semibold mb-1"
+                    style={{ color: isPositive ? "#4ade80" : "#f87171" }}
+                  >
+                    {isPositive ? "▲" : "▼"}&nbsp;
+                    {Math.abs(parseFloat(change)).toFixed(2)}&nbsp;
+                    ({Math.abs(parseFloat(changePctRaw)).toFixed(2)}%)
+                  </p>
+                )}
+                {(priceSource === "live" || priceSource === "yahoo") ? (
+                  <p className="text-[10px] tracking-widest uppercase font-semibold" style={{ color: "#4ade80" }}>
+                    ● Live
+                  </p>
+                ) : priceSource === "delayed" ? (
+                  <p className="text-[10px] tracking-widest uppercase font-medium" style={{ color: "#8a6820" }}>
+                    Delayed data
+                  </p>
+                ) : lastDay ? (
+                  <p className="text-[#777] text-[11px] tracking-widest">
+                    As of {lastDay}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="font-bold mb-1" style={{ fontSize: "clamp(1.9rem, 6vw, 2.6rem)", lineHeight: 1, color: "#2a2a2a" }}>
+                  $—
+                  <span className="text-sm font-normal ml-1" style={{ color: "#2a2a2a" }}>{overview.Currency}</span>
                 </p>
-              )}
-            </div>
-          )}
+                <p className="text-[10px] tracking-widest uppercase font-medium" style={{ color: "#555" }}>
+                  Price data unavailable
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Key metrics grid ── */}
@@ -224,6 +242,9 @@ export default async function AnalyzePage({
           <MetricCard label="52-Week High"  value={fmt(overview["52WeekHigh"], "currency")} primary={false} />
           <MetricCard label="52-Week Low"   value={fmt(overview["52WeekLow"], "currency")} primary={false} />
         </div>
+
+        {/* ── Analysis gate: 1 free per day, blur after ── */}
+        <AnalysisGate>
 
         {/* ── Athena AI Analysis ── */}
         <AthenaAnalysis overview={overview} quote={quote} />
@@ -314,8 +335,10 @@ export default async function AnalyzePage({
 
         {/* Data source note */}
         <p className="text-center text-[10px] text-[#555] tracking-widest uppercase">
-          Data sourced from Alpha Vantage &bull; For informational purposes only &bull; Not financial advice
+          Market data from Finnhub &bull; For informational purposes only &bull; Not financial advice
         </p>
+
+        </AnalysisGate>
       </main>
 
     </div>
@@ -395,9 +418,8 @@ const ERROR_MESSAGES: Record<ErrorCode, { title: string; message: string }> = {
       "Market data is temporarily unavailable. Please try again in a few minutes.",
   },
   invalid_ticker: {
-    title: "Ticker Not Found",
-    message:
-      "We couldn't find this ticker symbol. Please double-check the symbol and try again.",
+    title: "Symbol Not Found",
+    message: "", // rendered dynamically with the symbol below
   },
   network_error: {
     title: "Connection Issue",
@@ -432,19 +454,17 @@ function ErrorState({ error, symbol }: { error: string; symbol: string }) {
           </svg>
         </div>
 
-        {error === "invalid_ticker" && (
-          <p className="text-[#555] text-[11px] tracking-widest uppercase mb-2">
-            Ticker: {symbol}
-          </p>
-        )}
-
         <h1
           className="text-white text-2xl font-bold mb-3"
           style={{ fontFamily: "'Cinzel', serif" }}
         >
           {info.title}
         </h1>
-        <p className="text-[#666] text-sm leading-relaxed mb-8">{info.message}</p>
+        <p className="text-[#666] text-sm leading-relaxed mb-8">
+          {error === "invalid_ticker"
+            ? `We couldn't find ${symbol}. Please check the ticker symbol and try again.`
+            : info.message}
+        </p>
 
         <Link
           href="/"

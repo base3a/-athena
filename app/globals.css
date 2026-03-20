@@ -166,6 +166,12 @@ input:-webkit-autofill:focus {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Bouncing dots — "Athena is analyzing…" skeleton indicator */
+@keyframes analyzing-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
+  40%            { transform: scale(1.2); opacity: 1; }
+}
+
 /* ── Screener filter sliders ──────────────────────────────────────────────── */
 .screener-slider {
   -webkit-appearance: none;

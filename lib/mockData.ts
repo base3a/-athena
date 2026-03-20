@@ -8,6 +8,15 @@ interface MockEntry {
   quote: GlobalQuote;
 }
 
+/** Returns the most recent weekday (Mon–Fri) as a YYYY-MM-DD string. */
+function lastWeekday(): string {
+  const d = new Date();
+  const day = d.getUTCDay(); // 0=Sun, 6=Sat
+  if (day === 0) d.setUTCDate(d.getUTCDate() - 2); // Sun → Fri
+  if (day === 6) d.setUTCDate(d.getUTCDate() - 1); // Sat → Fri
+  return d.toISOString().slice(0, 10);
+}
+
 function makeQuote(
   symbol: string,
   price: number,
@@ -24,7 +33,7 @@ function makeQuote(
     "04. low": (price * 0.987).toFixed(2),
     "05. price": price.toFixed(2),
     "06. volume": volume,
-    "07. latest trading day": "2026-02-28",
+    "07. latest trading day": lastWeekday(),
     "08. previous close": prevClose.toFixed(2),
     "09. change": change,
     "10. change percent": changePct,

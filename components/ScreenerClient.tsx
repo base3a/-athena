@@ -1,127 +1,230 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { ScreenerMetrics } from "@/app/api/screener-data/route";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type MarketCapFilter = "All" | "Large" | "Mid" | "Small";
 type RegionFilter    = "All" | "US"    | "Global";
 type SortDir         = "asc" | "desc";
-type SortableKey     = "pe" | "roe" | "profitMargin" | "revenueGrowth" | "athenaScore";
+type SortableKey     = "pe" | "roe" | "profitMargin" | "revenueGrowth" | "dividendYield" | "epsGrowth";
 
-interface Stock {
-  ticker:        string;
-  company:       string;
-  sector:        string;
-  pe:            number;
-  roe:           number;
-  profitMargin:  number;
-  revenueGrowth: number;
-  athenaScore:   number;
-  marketCap:     "Large" | "Mid" | "Small";
-  region:        "US" | "Global";
+// Static identity — what we know without an API call
+interface StockIdentity {
+  ticker:  string;
+  company: string;
+  sector:  string;
+  region:  "US" | "Global";
+}
+
+// Merged display type — identity + live metrics (all metrics nullable)
+interface Stock extends StockIdentity {
+  pe:            number | null;
+  roe:           number | null;
+  profitMargin:  number | null;
+  revenueGrowth: number | null;
+  dividendYield: number | null;
+  debtToEquity:  number | null;
+  pb:            number | null;
+  epsGrowth:     number | null;
+  marketCap:     "Large" | "Mid" | "Small" | null;
+  insight:       string;
 }
 
 interface Col {
-  key:      keyof Stock;
+  key:      keyof Stock | "insight";
   label:    string;
   sortable: boolean;
   align:    "left" | "right";
 }
 
 interface FilterState {
-  maxPE:     number;
-  minMargin: number;
-  minROE:    number;
-  marketCap: MarketCapFilter;
-  sector:    string;
-  region:    RegionFilter;
-  minGrowth: number; // hidden — only activated by GARP preset
+  maxPE:            number;
+  minMargin:        number;
+  minROE:           number;
+  marketCap:        MarketCapFilter;
+  sector:           string;
+  region:           RegionFilter;
+  minRevenueGrowth: number;
+  minDividendYield: number;
+  maxDebtToEquity:  number; // 10 = any
+  maxPB:            number; // 50 = any
+  minEpsGrowth:     number;
 }
 
-// ── Mock data (35 stocks) ──────────────────────────────────────────────────────
-// Score distribution: 9=3 (rare/elite), 8=10, 7=14, 6=7, 5=1
-const STOCKS: Stock[] = [
-  // Score 9 — elite tier (3 of 35)
-  { ticker: "MSFT",  company: "Microsoft",           sector: "Technology",    pe: 32.8, roe:  38.2, profitMargin: 34.1, revenueGrowth:  15.7, athenaScore: 9, marketCap: "Large", region: "US" },
-  { ticker: "V",     company: "Visa",                 sector: "Financials",    pe: 28.4, roe:  42.1, profitMargin: 51.2, revenueGrowth:  10.4, athenaScore: 9, marketCap: "Large", region: "US" },
-  { ticker: "NVO",   company: "Novo Nordisk",         sector: "Healthcare",    pe: 38.4, roe:  81.4, profitMargin: 32.8, revenueGrowth:  22.4, athenaScore: 9, marketCap: "Large", region: "Global" },
-  // Score 8 — excellent (10 of 35)
-  { ticker: "META",  company: "Meta Platforms",       sector: "Technology",    pe: 26.3, roe:  32.1, profitMargin: 28.9, revenueGrowth:  22.1, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "NVDA",  company: "Nvidia",               sector: "Technology",    pe: 44.2, roe:  91.4, profitMargin: 53.4, revenueGrowth: 122.4, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "MA",    company: "Mastercard",           sector: "Financials",    pe: 33.2, roe:  56.4, profitMargin: 44.6, revenueGrowth:  12.8, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "ASML",  company: "ASML Holding",         sector: "Technology",    pe: 36.2, roe:  42.8, profitMargin: 26.4, revenueGrowth:  15.8, athenaScore: 8, marketCap: "Large", region: "Global" },
-  { ticker: "AAPL",  company: "Apple",                sector: "Technology",    pe: 29.4, roe: 147.2, profitMargin: 26.4, revenueGrowth:   2.8, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "GOOGL", company: "Alphabet",             sector: "Technology",    pe: 24.1, roe:  26.4, profitMargin: 24.0, revenueGrowth:  13.4, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "MSCI",  company: "MSCI Inc",             sector: "Financials",    pe: 42.8, roe:  62.4, profitMargin: 38.4, revenueGrowth:  11.8, athenaScore: 8, marketCap: "Mid",   region: "US" },
-  { ticker: "LLY",   company: "Eli Lilly",            sector: "Healthcare",    pe: 52.4, roe:  78.9, profitMargin: 19.8, revenueGrowth:  31.4, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "ADBE",  company: "Adobe",                sector: "Technology",    pe: 38.4, roe:  36.8, profitMargin: 27.8, revenueGrowth:  10.8, athenaScore: 8, marketCap: "Large", region: "US" },
-  { ticker: "INTU",  company: "Intuit",               sector: "Technology",    pe: 56.2, roe:  41.8, profitMargin: 16.4, revenueGrowth:  12.9, athenaScore: 8, marketCap: "Mid",   region: "US" },
-  { ticker: "TSM",   company: "TSMC",                 sector: "Technology",    pe: 22.4, roe:  26.4, profitMargin: 38.4, revenueGrowth:  29.4, athenaScore: 8, marketCap: "Large", region: "Global" },
-  // Score 7 — good quality (14 of 35)
-  { ticker: "JPM",   company: "JPMorgan Chase",       sector: "Financials",    pe: 13.1, roe:  17.2, profitMargin: 27.4, revenueGrowth:   9.8, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "UNH",   company: "UnitedHealth Group",   sector: "Healthcare",    pe: 21.3, roe:  26.4, profitMargin:  6.4, revenueGrowth:   8.9, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "COST",  company: "Costco",               sector: "Staples",       pe: 48.2, roe:  29.4, profitMargin:  2.9, revenueGrowth:   7.2, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "AMZN",  company: "Amazon",               sector: "Consumer Disc", pe: 41.8, roe:  18.9, profitMargin:  8.1, revenueGrowth:  13.2, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "JNJ",   company: "Johnson & Johnson",    sector: "Healthcare",    pe: 16.2, roe:  22.8, profitMargin: 21.4, revenueGrowth:   4.6, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "ABT",   company: "Abbott Laboratories",  sector: "Healthcare",    pe: 23.8, roe:  18.4, profitMargin: 12.8, revenueGrowth:   4.2, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "PG",    company: "Procter & Gamble",     sector: "Staples",       pe: 27.1, roe:  31.4, profitMargin: 18.2, revenueGrowth:   2.8, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "KO",    company: "Coca-Cola",            sector: "Staples",       pe: 24.6, roe:  38.8, profitMargin: 22.4, revenueGrowth:   3.2, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "CAT",   company: "Caterpillar",          sector: "Industrials",   pe: 18.4, roe:  52.4, profitMargin: 15.6, revenueGrowth:   2.1, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "HON",   company: "Honeywell",            sector: "Industrials",   pe: 22.1, roe:  28.4, profitMargin: 14.8, revenueGrowth:   3.8, athenaScore: 7, marketCap: "Large", region: "US" },
-  { ticker: "ODFL",  company: "Old Dominion Freight", sector: "Industrials",   pe: 30.4, roe:  28.9, profitMargin: 18.6, revenueGrowth:   0.4, athenaScore: 7, marketCap: "Mid",   region: "US" },
-  { ticker: "QLYS",  company: "Qualys",               sector: "Technology",    pe: 28.4, roe:  32.6, profitMargin: 28.9, revenueGrowth:   7.4, athenaScore: 7, marketCap: "Small", region: "US" },
-  { ticker: "SAP",   company: "SAP SE",               sector: "Technology",    pe: 42.4, roe:  18.4, profitMargin: 14.2, revenueGrowth:  10.4, athenaScore: 7, marketCap: "Large", region: "Global" },
-  // Score 6 — average quality (7 of 35)
-  { ticker: "SSD",   company: "Simpson Manufacturing",sector: "Industrials",   pe: 18.2, roe:  21.4, profitMargin: 12.4, revenueGrowth:   4.2, athenaScore: 6, marketCap: "Small", region: "US" },
-  { ticker: "LVMH",  company: "LVMH",                 sector: "Consumer Disc", pe: 21.4, roe:  20.8, profitMargin: 16.8, revenueGrowth:   2.4, athenaScore: 6, marketCap: "Large", region: "Global" },
-  { ticker: "CRM",   company: "Salesforce",           sector: "Technology",    pe: 44.2, roe:  11.4, profitMargin: 15.2, revenueGrowth:  11.4, athenaScore: 6, marketCap: "Large", region: "US" },
-  { ticker: "NKE",   company: "Nike",                 sector: "Consumer Disc", pe: 28.6, roe:  32.4, profitMargin: 10.2, revenueGrowth:  -0.3, athenaScore: 6, marketCap: "Large", region: "US" },
-  { ticker: "XOM",   company: "ExxonMobil",           sector: "Energy",        pe: 14.8, roe:  16.4, profitMargin: 10.2, revenueGrowth:  -2.4, athenaScore: 6, marketCap: "Large", region: "US" },
-  { ticker: "CVX",   company: "Chevron",              sector: "Energy",        pe: 16.2, roe:  14.8, profitMargin:  9.4, revenueGrowth:  -4.8, athenaScore: 6, marketCap: "Large", region: "US" },
-  { ticker: "ROP",   company: "Roper Technologies",   sector: "Industrials",   pe: 40.2, roe:  12.4, profitMargin: 20.1, revenueGrowth:   8.4, athenaScore: 6, marketCap: "Mid",   region: "US" },
-  // Score 5 — weak quality (1 of 35)
-  { ticker: "BABA",  company: "Alibaba Group",        sector: "Consumer Disc", pe:  8.2, roe:  12.4, profitMargin: 10.4, revenueGrowth:   7.8, athenaScore: 5, marketCap: "Large", region: "Global" },
+// ── Insight generator ──────────────────────────────────────────────────────────
+function generateInsight(m: ScreenerMetrics): string {
+  const roe = m.roe           ?? 0;
+  const pm  = m.profitMargin  ?? 0;
+  const dy  = m.dividendYield ?? 0;
+  const pb  = m.pb            ?? 99;
+  const pe  = m.pe            ?? 99;
+  const de  = m.debtToEquity  ?? 99;
+  const rg  = m.revenueGrowth ?? 0;
+  const eg  = m.epsGrowth     ?? 0;
+
+  if (roe >= 80  && pm  >= 30)           return "Elite ROE with exceptional profit margins";
+  if (roe >= 50  && rg  >= 20)           return "High-velocity compounder at scale";
+  if (dy  >= 5.5)                        return "High yield anchored by defensive earnings";
+  if (pb  > 0 && pb <= 1.2 && roe >= 10) return "Trading near book value with improving returns";
+  if (pe  <= 12  && dy  >= 2.5)          return "Deep value with reliable dividend income";
+  if (pm  >= 35)                         return "Extraordinary margins signal durable pricing power";
+  if (roe >= 30  && de  <= 0.2)          return "High ROE with a fortress balance sheet";
+  if (rg  >= 35  && pm  >= 15)           return "Hypergrowth compounder with expanding margins";
+  if (dy  >= 3   && eg  >= 8)            return "Growing dividend backed by strong EPS gains";
+  if (pe  <= 15  && roe >= 20)           return "Undervalued quality with high capital efficiency";
+  if (pm  >= 25  && roe >= 25)           return "Wide moat reflected in margins and returns";
+  if (eg  >= 50)                         return "EPS acceleration signals a business inflection";
+  if (de  === 0)                         return "Debt-free, self-funding quality business";
+  if (rg  >= 15  && pe  <= 45)           return "Consistent growth at a reasonable valuation";
+  if (roe >= 20  && pm  >= 15)           return "Consistent quality across key metrics";
+  if (dy  >= 3)                          return "Reliable income with stable fundamental backing";
+  if (rg  >= 8   && roe >= 12)           return "Steady compounder with improving efficiency";
+  return "Solid fundamentals across key quality metrics";
+}
+
+// ── Stock universe — identity only (metrics are fetched live) ──────────────────
+const STOCKS_BASE: StockIdentity[] = [
+  // ── US Mega-cap Technology ────────────────────────────────────────────────────
+  { ticker: "MSFT",  company: "Microsoft",               sector: "Technology",    region: "US"     },
+  { ticker: "AAPL",  company: "Apple",                   sector: "Technology",    region: "US"     },
+  { ticker: "GOOGL", company: "Alphabet",                sector: "Technology",    region: "US"     },
+  { ticker: "META",  company: "Meta Platforms",          sector: "Technology",    region: "US"     },
+  { ticker: "NVDA",  company: "Nvidia",                  sector: "Technology",    region: "US"     },
+  { ticker: "TSLA",  company: "Tesla",                   sector: "Consumer Disc", region: "US"     },
+  { ticker: "AVGO",  company: "Broadcom",                sector: "Technology",    region: "US"     },
+  { ticker: "ADBE",  company: "Adobe",                   sector: "Technology",    region: "US"     },
+  { ticker: "INTU",  company: "Intuit",                  sector: "Technology",    region: "US"     },
+  { ticker: "CRM",   company: "Salesforce",              sector: "Technology",    region: "US"     },
+  { ticker: "NOW",   company: "ServiceNow",              sector: "Technology",    region: "US"     },
+  { ticker: "PANW",  company: "Palo Alto Networks",      sector: "Technology",    region: "US"     },
+  { ticker: "VEEV",  company: "Veeva Systems",           sector: "Technology",    region: "US"     },
+  { ticker: "QLYS",  company: "Qualys",                  sector: "Technology",    region: "US"     },
+  // ── US Semiconductors ─────────────────────────────────────────────────────────
+  { ticker: "AMAT",  company: "Applied Materials",       sector: "Technology",    region: "US"     },
+  { ticker: "LRCX",  company: "Lam Research",            sector: "Technology",    region: "US"     },
+  { ticker: "KLAC",  company: "KLA Corporation",         sector: "Technology",    region: "US"     },
+  { ticker: "QCOM",  company: "Qualcomm",                sector: "Technology",    region: "US"     },
+  { ticker: "TXN",   company: "Texas Instruments",       sector: "Technology",    region: "US"     },
+  // ── US Financials ─────────────────────────────────────────────────────────────
+  { ticker: "V",     company: "Visa",                    sector: "Financials",    region: "US"     },
+  { ticker: "MA",    company: "Mastercard",              sector: "Financials",    region: "US"     },
+  { ticker: "MSCI",  company: "MSCI Inc",                sector: "Financials",    region: "US"     },
+  { ticker: "SPGI",  company: "S&P Global",              sector: "Financials",    region: "US"     },
+  { ticker: "MCO",   company: "Moody's Corporation",     sector: "Financials",    region: "US"     },
+  { ticker: "JPM",   company: "JPMorgan Chase",          sector: "Financials",    region: "US"     },
+  { ticker: "AXP",   company: "American Express",        sector: "Financials",    region: "US"     },
+  { ticker: "BLK",   company: "BlackRock",               sector: "Financials",    region: "US"     },
+  { ticker: "GS",    company: "Goldman Sachs",           sector: "Financials",    region: "US"     },
+  { ticker: "SCHW",  company: "Charles Schwab",          sector: "Financials",    region: "US"     },
+  { ticker: "BRK-B", company: "Berkshire Hathaway B",    sector: "Financials",    region: "US"     },
+  // ── US Healthcare ─────────────────────────────────────────────────────────────
+  { ticker: "LLY",   company: "Eli Lilly",               sector: "Healthcare",    region: "US"     },
+  { ticker: "UNH",   company: "UnitedHealth Group",      sector: "Healthcare",    region: "US"     },
+  { ticker: "JNJ",   company: "Johnson & Johnson",       sector: "Healthcare",    region: "US"     },
+  { ticker: "ABT",   company: "Abbott Laboratories",     sector: "Healthcare",    region: "US"     },
+  { ticker: "TMO",   company: "Thermo Fisher Scientific",sector: "Healthcare",    region: "US"     },
+  { ticker: "ISRG",  company: "Intuitive Surgical",      sector: "Healthcare",    region: "US"     },
+  { ticker: "ABBV",  company: "AbbVie",                  sector: "Healthcare",    region: "US"     },
+  { ticker: "VRTX",  company: "Vertex Pharmaceuticals",  sector: "Healthcare",    region: "US"     },
+  // ── US Consumer ───────────────────────────────────────────────────────────────
+  { ticker: "AMZN",  company: "Amazon",                  sector: "Consumer Disc", region: "US"     },
+  { ticker: "NFLX",  company: "Netflix",                 sector: "Consumer Disc", region: "US"     },
+  { ticker: "NKE",   company: "Nike",                    sector: "Consumer Disc", region: "US"     },
+  { ticker: "COST",  company: "Costco",                  sector: "Staples",       region: "US"     },
+  { ticker: "WMT",   company: "Walmart",                 sector: "Staples",       region: "US"     },
+  { ticker: "PG",    company: "Procter & Gamble",        sector: "Staples",       region: "US"     },
+  { ticker: "KO",    company: "Coca-Cola",               sector: "Staples",       region: "US"     },
+  { ticker: "PEP",   company: "PepsiCo",                 sector: "Staples",       region: "US"     },
+  // ── US Industrials ────────────────────────────────────────────────────────────
+  { ticker: "CAT",   company: "Caterpillar",             sector: "Industrials",   region: "US"     },
+  { ticker: "HON",   company: "Honeywell",               sector: "Industrials",   region: "US"     },
+  { ticker: "ODFL",  company: "Old Dominion Freight",    sector: "Industrials",   region: "US"     },
+  { ticker: "FAST",  company: "Fastenal",                sector: "Industrials",   region: "US"     },
+  { ticker: "SSD",   company: "Simpson Manufacturing",   sector: "Industrials",   region: "US"     },
+  { ticker: "ROP",   company: "Roper Technologies",      sector: "Industrials",   region: "US"     },
+  { ticker: "CTAS",  company: "Cintas Corporation",      sector: "Industrials",   region: "US"     },
+  { ticker: "ECL",   company: "Ecolab",                  sector: "Industrials",   region: "US"     },
+  { ticker: "SHW",   company: "Sherwin-Williams",        sector: "Industrials",   region: "US"     },
+  { ticker: "CPRT",  company: "Copart",                  sector: "Industrials",   region: "US"     },
+  // ── US Energy ─────────────────────────────────────────────────────────────────
+  { ticker: "XOM",   company: "ExxonMobil",              sector: "Energy",        region: "US"     },
+  { ticker: "CVX",   company: "Chevron",                 sector: "Energy",        region: "US"     },
+  // ── US Telecom ────────────────────────────────────────────────────────────────
+  { ticker: "VZ",    company: "Verizon",                 sector: "Telecom",       region: "US"     },
+  { ticker: "T",     company: "AT&T",                    sector: "Telecom",       region: "US"     },
+  // ── US Real Estate ────────────────────────────────────────────────────────────
+  { ticker: "O",     company: "Realty Income",           sector: "Real Estate",   region: "US"     },
+  { ticker: "PLD",   company: "Prologis",                sector: "Real Estate",   region: "US"     },
+  { ticker: "AMT",   company: "American Tower",          sector: "Real Estate",   region: "US"     },
+  // ── European Stocks ───────────────────────────────────────────────────────────
+  { ticker: "ASML",  company: "ASML Holding",            sector: "Technology",    region: "Global" },
+  { ticker: "SAP",   company: "SAP SE",                  sector: "Technology",    region: "Global" },
+  { ticker: "NVO",   company: "Novo Nordisk",            sector: "Healthcare",    region: "Global" },
+  { ticker: "LVMH",  company: "LVMH",                    sector: "Consumer Disc", region: "Global" },
+  { ticker: "NSRGY", company: "Nestlé",                  sector: "Staples",       region: "Global" },
+  { ticker: "HESAY", company: "Hermès International",    sector: "Consumer Disc", region: "Global" },
+  { ticker: "RELX",  company: "RELX PLC",                sector: "Technology",    region: "Global" },
+  // ── Swedish Stocks ────────────────────────────────────────────────────────────
+  { ticker: "ERIC",  company: "Ericsson",                sector: "Technology",    region: "Global" },
+  { ticker: "SPOT",  company: "Spotify Technology",      sector: "Technology",    region: "Global" },
+  { ticker: "ATLCY", company: "Atlas Copco",             sector: "Industrials",   region: "Global" },
+  { ticker: "HXGBY", company: "Hexagon AB",              sector: "Technology",    region: "Global" },
+  // ── Asian Stocks ──────────────────────────────────────────────────────────────
+  { ticker: "TSM",   company: "TSMC",                    sector: "Technology",    region: "Global" },
+  { ticker: "SSNLF", company: "Samsung Electronics",     sector: "Technology",    region: "Global" },
+  { ticker: "TM",    company: "Toyota Motor",            sector: "Consumer Disc", region: "Global" },
+  { ticker: "SONY",  company: "Sony Group",              sector: "Consumer Disc", region: "Global" },
+  { ticker: "KYCCF", company: "Keyence Corporation",     sector: "Technology",    region: "Global" },
+  { ticker: "MELI",  company: "MercadoLibre",            sector: "Consumer Disc", region: "Global" },
+  { ticker: "BABA",  company: "Alibaba Group",           sector: "Consumer Disc", region: "Global" },
 ];
+
+const ALL_TICKERS = STOCKS_BASE.map((s) => s.ticker);
 
 const ALL_SECTORS = [
   "All", "Technology", "Financials", "Healthcare",
   "Staples", "Consumer Disc", "Industrials", "Energy",
+  "Telecom", "Real Estate",
 ];
 
-// ── Presets ────────────────────────────────────────────────────────────────────
+// ── Filters & Presets ──────────────────────────────────────────────────────────
 const DEFAULT_FILTERS: FilterState = {
   maxPE: 100, minMargin: 0, minROE: 0,
-  marketCap: "All", sector: "All", region: "All", minGrowth: 0,
+  marketCap: "All", sector: "All", region: "All",
+  minRevenueGrowth: 0, minDividendYield: 0,
+  maxDebtToEquity: 10, maxPB: 50, minEpsGrowth: 0,
 };
 
 const PRESETS: { id: string; label: string; desc: string; filters: Partial<FilterState> }[] = [
-  { id: "high-roe",            label: "High ROE",             desc: "Exceptional returns on equity",         filters: { minROE: 30 } },
-  { id: "undervalued-quality", label: "Undervalued Quality",  desc: "Strong fundamentals below fair value",  filters: { maxPE: 25, minROE: 15, minMargin: 10 } },
-  { id: "strong-fcf",          label: "Strong FCF",           desc: "Significant free cash flow generation", filters: { minMargin: 20 } },
-  { id: "defensive-moats",     label: "Defensive Moats",      desc: "Durable advantages, stable businesses", filters: { minROE: 20, minMargin: 14 } },
-  { id: "garp",                label: "Growth · Fair Price",  desc: "Growing companies, not overpriced",     filters: { maxPE: 40, minGrowth: 10 } },
+  { id: "high-roe",            label: "High ROE",             desc: "Exceptional returns on equity",               filters: { minROE: 30 } },
+  { id: "undervalued-quality", label: "Undervalued Quality",  desc: "Strong fundamentals below fair value",        filters: { maxPE: 25, minROE: 15, minMargin: 10 } },
+  { id: "strong-fcf",          label: "Strong FCF",           desc: "Significant free cash flow generation",       filters: { minMargin: 20 } },
+  { id: "defensive-moats",     label: "Defensive Moats",      desc: "Durable advantages, stable businesses",       filters: { minROE: 20, minMargin: 14 } },
+  { id: "garp",                label: "Growth · Fair Price",  desc: "Growing companies, not overpriced",           filters: { maxPE: 40, minRevenueGrowth: 10 } },
+  { id: "deep-value",          label: "Deep Value",           desc: "Low valuation, high dividend, real assets",   filters: { maxPE: 15, maxPB: 2.5, minDividendYield: 2 } },
+  { id: "quality-compounder",  label: "Quality Compounder",   desc: "High ROE, clean balance sheet, steady growth",filters: { minROE: 25, maxDebtToEquity: 0.5, minRevenueGrowth: 7 } },
+  { id: "turnaround-play",     label: "Turnaround Play",      desc: "Beaten-down price, improving earnings",       filters: { maxPE: 20, minEpsGrowth: 8, minRevenueGrowth: 5 } },
+  { id: "dividend-income",     label: "Dividend Income",      desc: "High yield with stable earnings",             filters: { minDividendYield: 3.0, minMargin: 8 } },
 ];
 
 const COLS: Col[] = [
-  { key: "ticker",        label: "Ticker",       sortable: false, align: "left"  },
-  { key: "company",       label: "Company",      sortable: false, align: "left"  },
-  { key: "sector",        label: "Sector",       sortable: false, align: "left"  },
-  { key: "pe",            label: "P/E",          sortable: true,  align: "right" },
-  { key: "roe",           label: "ROE",          sortable: true,  align: "right" },
-  { key: "profitMargin",  label: "Margin",       sortable: true,  align: "right" },
-  { key: "revenueGrowth", label: "Growth",       sortable: true,  align: "right" },
-  { key: "athenaScore",   label: "Athena Score", sortable: true,  align: "right" },
+  { key: "ticker",        label: "Ticker",         sortable: false, align: "left"  },
+  { key: "company",       label: "Company",        sortable: false, align: "left"  },
+  { key: "sector",        label: "Sector",         sortable: false, align: "left"  },
+  { key: "pe",            label: "P/E",            sortable: true,  align: "right" },
+  { key: "roe",           label: "ROE",            sortable: true,  align: "right" },
+  { key: "profitMargin",  label: "Margin",         sortable: true,  align: "right" },
+  { key: "revenueGrowth", label: "Rev Growth",     sortable: true,  align: "right" },
+  { key: "dividendYield", label: "Div Yield",      sortable: true,  align: "right" },
+  { key: "epsGrowth",     label: "EPS Growth",     sortable: true,  align: "right" },
+  { key: "insight",       label: "Athena's Take",  sortable: false, align: "left"  },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function scoreColor(s: number): string {
-  if (s >= 9) return "#4ade80";
-  if (s >= 7) return "#d4a017";
-  if (s >= 5) return "#888888";
-  return "#f87171";
-}
-function growthColor(g: number): string {
+function signColor(g: number | null): string {
+  if (g === null) return "#444";
   return g >= 0 ? "#7abf9a" : "#c47878";
 }
 function fmt(n: number, dec = 1): string {
@@ -137,8 +240,45 @@ export default function ScreenerClient() {
     ...DEFAULT_FILTERS,
     ...PRESETS.find((p) => p.id === "high-roe")!.filters,
   });
-  const [sortKey, setSortKey]           = useState<SortableKey>("athenaScore");
-  const [sortDir, setSortDir]           = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState<SortableKey>("roe");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // ── Live data state ──────────────────────────────────────────────────────────
+  const [liveData,  setLiveData]  = useState<Record<string, ScreenerMetrics>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const symbols = ALL_TICKERS.join(",");
+    fetch(`/api/screener-data?symbols=${symbols}`)
+      .then((r) => r.json())
+      .then((data: Record<string, ScreenerMetrics>) => {
+        setLiveData(data);
+        setIsLoading(false);
+      })
+      .catch(() => setIsLoading(false));
+  }, []);
+
+  // ── Merge identity + live metrics ────────────────────────────────────────────
+  const stocks: Stock[] = useMemo(
+    () =>
+      STOCKS_BASE.map((base) => {
+        const live = liveData[base.ticker] ?? null;
+        return {
+          ...base,
+          pe:            live?.pe            ?? null,
+          roe:           live?.roe           ?? null,
+          profitMargin:  live?.profitMargin  ?? null,
+          revenueGrowth: live?.revenueGrowth ?? null,
+          dividendYield: live?.dividendYield ?? null,
+          debtToEquity:  live?.debtToEquity  ?? null,
+          pb:            live?.pb            ?? null,
+          epsGrowth:     live?.epsGrowth     ?? null,
+          marketCap:     live?.marketCapCat  ?? null,
+          insight:       live ? generateInsight(live) : "",
+        };
+      }),
+    [liveData],
+  );
 
   function applyPreset(id: string) {
     if (activePreset === id) {
@@ -172,40 +312,78 @@ export default function ScreenerClient() {
   }
 
   const results = useMemo(() => {
-    return STOCKS.filter((s) => {
-      if (filters.maxPE < 100 && s.pe > filters.maxPE) return false;
-      if (s.profitMargin  < filters.minMargin) return false;
-      if (s.roe           < filters.minROE)    return false;
-      if (s.revenueGrowth < filters.minGrowth) return false;
-      if (filters.marketCap !== "All" && s.marketCap !== filters.marketCap) return false;
-      if (filters.sector    !== "All" && s.sector    !== filters.sector)    return false;
-      if (filters.region    !== "All" && s.region    !== filters.region)    return false;
-      return true;
-    })
-    .sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
-      return sortDir === "desc" ? bv - av : av - bv;
-    })
-    .slice(0, 20);
-  }, [filters, sortKey, sortDir]);
+    return stocks
+      .filter((s) => {
+        // Numeric filters: null metric value → exclude when filter is active (honest: can't verify)
+        if (filters.maxPE < 100 && (s.pe === null || s.pe > filters.maxPE))                                 return false;
+        if (filters.minMargin > 0 && (s.profitMargin === null || s.profitMargin < filters.minMargin))       return false;
+        if (filters.minROE    > 0 && (s.roe          === null || s.roe         < filters.minROE))           return false;
+        if (filters.minRevenueGrowth > 0 && (s.revenueGrowth === null || s.revenueGrowth < filters.minRevenueGrowth)) return false;
+        if (filters.minDividendYield > 0 && (s.dividendYield === null || s.dividendYield < filters.minDividendYield)) return false;
+        if (filters.maxDebtToEquity  < 10 && (s.debtToEquity === null || s.debtToEquity  > filters.maxDebtToEquity))  return false;
+        if (filters.maxPB < 50 && s.pb !== null && s.pb > 0 && s.pb > filters.maxPB)                       return false;
+        if (filters.minEpsGrowth > 0 && (s.epsGrowth === null || s.epsGrowth < filters.minEpsGrowth))      return false;
+        // Category filters
+        if (filters.marketCap !== "All" && s.marketCap !== filters.marketCap) return false;
+        if (filters.sector    !== "All" && s.sector    !== filters.sector)    return false;
+        if (filters.region    !== "All" && s.region    !== filters.region)    return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const av = a[sortKey] as number | null;
+        const bv = b[sortKey] as number | null;
+        // Null values always sink to the bottom
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        return sortDir === "desc" ? bv - av : av - bv;
+      })
+      .slice(0, 25);
+  }, [stocks, filters, sortKey, sortDir]);
 
   const hasActiveFilters =
     filters.maxPE < 100 || filters.minMargin > 0 || filters.minROE > 0 ||
-    filters.marketCap !== "All" || filters.sector !== "All" ||
-    filters.region !== "All" || filters.minGrowth > 0;
+    filters.marketCap !== "All" || filters.sector !== "All" || filters.region !== "All" ||
+    filters.minRevenueGrowth > 0 || filters.minDividendYield > 0 ||
+    filters.maxDebtToEquity < 10 || filters.maxPB < 50 || filters.minEpsGrowth > 0;
 
-  // ── Toggle pill style helper ─────────────────────────────────────────────────
   function pillStyle(active: boolean): React.CSSProperties {
     return {
       flex: 1, padding: "11px 0", minHeight: 44, borderRadius: 6, cursor: "pointer",
       display: "flex", alignItems: "center", justifyContent: "center",
-      border:      `1px solid ${active ? "rgba(212,160,23,0.4)" : "#1e1e1e"}`,
+      border:     `1px solid ${active ? "rgba(212,160,23,0.4)" : "#1e1e1e"}`,
       background:  active ? "rgba(212,160,23,0.08)" : "transparent",
       color:       active ? "#d4a017" : "#9A9A9A",
       fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" as const,
       fontWeight: 600, transition: "all 0.12s ease",
     };
+  }
+
+  // ── Slider helpers ───────────────────────────────────────────────────────────
+  function SliderRow({
+    label, value, display, min, max, step, onChange,
+  }: {
+    label: string; value: number; display: string;
+    min: number; max: number; step: number;
+    onChange: (v: number) => void;
+  }) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-baseline justify-between">
+          <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            {label}
+          </label>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
+            {display}
+          </span>
+        </div>
+        <input
+          type="range" className="screener-slider"
+          min={min} max={max} step={step} value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      </div>
+    );
   }
 
   return (
@@ -247,7 +425,7 @@ export default function ScreenerClient() {
         )}
       </div>
       <p style={{ fontSize: 9.5, color: "#7A7A7A", letterSpacing: "0.06em", marginTop: -8 }}>
-        Preset applies quality thresholds automatically.
+        Preset applies quality thresholds automatically. Click again to deactivate.
       </p>
 
       {/* ── Filters Panel ──────────────────────────────────────────────────── */}
@@ -255,59 +433,80 @@ export default function ScreenerClient() {
         className="rounded-2xl p-5"
         style={{ background: "#080808", border: "1px solid #1a1a1a" }}
       >
+        {/* Row 1 — Valuation */}
+        <p style={{ fontSize: 8, color: "#333", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>
+          Valuation
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5 mb-6">
+          <SliderRow
+            label="P/E Max" value={filters.maxPE}
+            display={filters.maxPE >= 100 ? "Any" : `≤ ${filters.maxPE}`}
+            min={5} max={100} step={5}
+            onChange={(v) => updateFilter({ maxPE: v })}
+          />
+          <SliderRow
+            label="Price to Book Max" value={filters.maxPB}
+            display={filters.maxPB >= 50 ? "Any" : `≤ ${fmt(filters.maxPB, 0)}x`}
+            min={1} max={50} step={1}
+            onChange={(v) => updateFilter({ maxPB: v })}
+          />
+          <SliderRow
+            label="Dividend Yield Min" value={filters.minDividendYield}
+            display={filters.minDividendYield === 0 ? "Any" : `≥ ${fmt(filters.minDividendYield, 1)}%`}
+            min={0} max={8} step={0.5}
+            onChange={(v) => updateFilter({ minDividendYield: v })}
+          />
+        </div>
+
+        {/* Row 2 — Quality */}
+        <p style={{ fontSize: 8, color: "#333", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>
+          Quality
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5 mb-6">
+          <SliderRow
+            label="Profit Margin Min" value={filters.minMargin}
+            display={filters.minMargin === 0 ? "Any" : `≥ ${filters.minMargin}%`}
+            min={0} max={40} step={2}
+            onChange={(v) => updateFilter({ minMargin: v })}
+          />
+          <SliderRow
+            label="ROE Min" value={filters.minROE}
+            display={filters.minROE === 0 ? "Any" : `≥ ${filters.minROE}%`}
+            min={0} max={60} step={5}
+            onChange={(v) => updateFilter({ minROE: v })}
+          />
+          <SliderRow
+            label="Debt / Equity Max" value={filters.maxDebtToEquity}
+            display={filters.maxDebtToEquity >= 10 ? "Any" : `≤ ${fmt(filters.maxDebtToEquity, 1)}x`}
+            min={0} max={10} step={0.5}
+            onChange={(v) => updateFilter({ maxDebtToEquity: v })}
+          />
+        </div>
+
+        {/* Row 3 — Growth */}
+        <p style={{ fontSize: 8, color: "#333", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>
+          Growth
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5 mb-6">
+          <SliderRow
+            label="Revenue Growth Min" value={filters.minRevenueGrowth}
+            display={filters.minRevenueGrowth === 0 ? "Any" : `≥ ${filters.minRevenueGrowth}%`}
+            min={0} max={40} step={2}
+            onChange={(v) => updateFilter({ minRevenueGrowth: v })}
+          />
+          <SliderRow
+            label="EPS Growth Min" value={filters.minEpsGrowth}
+            display={filters.minEpsGrowth === 0 ? "Any" : `≥ ${filters.minEpsGrowth}%`}
+            min={0} max={60} step={5}
+            onChange={(v) => updateFilter({ minEpsGrowth: v })}
+          />
+        </div>
+
+        {/* Row 4 — Universe */}
+        <p style={{ fontSize: 8, color: "#333", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>
+          Universe
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5">
-
-          {/* P/E Max */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
-                P/E Max
-              </label>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
-                {filters.maxPE >= 100 ? "Any" : `≤ ${filters.maxPE}`}
-              </span>
-            </div>
-            <input
-              type="range" className="screener-slider"
-              min={5} max={100} step={5} value={filters.maxPE}
-              onChange={(e) => updateFilter({ maxPE: Number(e.target.value) })}
-            />
-          </div>
-
-          {/* Profit Margin Min */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
-                Profit Margin Min
-              </label>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
-                {filters.minMargin === 0 ? "Any" : `≥ ${filters.minMargin}%`}
-              </span>
-            </div>
-            <input
-              type="range" className="screener-slider"
-              min={0} max={40} step={2} value={filters.minMargin}
-              onChange={(e) => updateFilter({ minMargin: Number(e.target.value) })}
-            />
-          </div>
-
-          {/* ROE Min */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-baseline justify-between">
-              <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
-                ROE Min
-              </label>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#888", fontWeight: 600 }}>
-                {filters.minROE === 0 ? "Any" : `≥ ${filters.minROE}%`}
-              </span>
-            </div>
-            <input
-              type="range" className="screener-slider"
-              min={0} max={60} step={5} value={filters.minROE}
-              onChange={(e) => updateFilter({ minROE: Number(e.target.value) })}
-            />
-          </div>
-
           {/* Market Cap */}
           <div className="flex flex-col gap-2.5">
             <label style={{ fontSize: 8.5, color: "#CFCFCF", letterSpacing: "0.22em", textTransform: "uppercase" }}>
@@ -356,16 +555,21 @@ export default function ScreenerClient() {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
       {/* ── Results bar ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <p style={{ fontSize: 9.5, color: "#444", letterSpacing: "0.16em", textTransform: "uppercase" }}>
-          {results.length} result{results.length !== 1 ? "s" : ""}
-          {results.length === 20 ? " · max" : ""}
-          <span style={{ color: "#333", marginLeft: 10 }}>Click any row to analyze</span>
+          {isLoading ? (
+            <span style={{ color: "#333" }}>Loading live market data…</span>
+          ) : (
+            <>
+              {results.length} result{results.length !== 1 ? "s" : ""}
+              {results.length === 25 ? " · max" : ""}
+              <span style={{ color: "#333", marginLeft: 10 }}>Click any row to analyze</span>
+            </>
+          )}
         </p>
         {hasActiveFilters && (
           <button
@@ -381,7 +585,7 @@ export default function ScreenerClient() {
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div style={{ overflowX: "auto", borderRadius: 16, border: "1px solid #161616" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
 
           {/* Header */}
           <thead>
@@ -393,7 +597,7 @@ export default function ScreenerClient() {
                     key={col.key}
                     onClick={col.sortable ? () => handleSort(col.key as SortableKey) : undefined}
                     style={{
-                      padding:       "13px 16px",
+                      padding:       col.key === "insight" ? "13px 20px" : "13px 16px",
                       textAlign:     col.align,
                       fontSize:      8.5,
                       color:         isSort ? "#d4a017" : "#3a3a3a",
@@ -420,7 +624,16 @@ export default function ScreenerClient() {
 
           {/* Body */}
           <tbody>
-            {results.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td
+                  colSpan={COLS.length}
+                  style={{ padding: "52px 24px", textAlign: "center", color: "#2a2a2a", fontSize: 13, letterSpacing: "0.06em" }}
+                >
+                  Loading live market data…
+                </td>
+              </tr>
+            ) : results.length === 0 ? (
               <tr>
                 <td
                   colSpan={COLS.length}
@@ -448,16 +661,13 @@ export default function ScreenerClient() {
                   >
                     {/* Ticker */}
                     <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                      <span style={{
-                        fontFamily: "'Cinzel', serif", fontSize: 12, fontWeight: 700,
-                        color: "#c49a28", letterSpacing: "0.08em",
-                      }}>
+                      <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, fontWeight: 700, color: "#c49a28", letterSpacing: "0.08em" }}>
                         {stock.ticker}
                       </span>
                     </td>
 
                     {/* Company */}
-                    <td style={{ padding: "14px 16px" }}>
+                    <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                       <span style={{ fontSize: 12, color: "#999", letterSpacing: "0.02em" }}>
                         {stock.company}
                       </span>
@@ -473,52 +683,61 @@ export default function ScreenerClient() {
                     {/* P/E */}
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
                       <span style={{ fontSize: 12, color: "#777", fontVariantNumeric: "tabular-nums" }}>
-                        {fmt(stock.pe)}
+                        {stock.pe !== null ? fmt(stock.pe) : "—"}
                       </span>
                     </td>
 
                     {/* ROE */}
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                      <span style={{
-                        fontSize: 12, fontVariantNumeric: "tabular-nums",
-                        color: stock.roe >= 30 ? "#7abf9a" : "#777",
-                      }}>
-                        {fmt(stock.roe)}%
+                      <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: stock.roe !== null ? (stock.roe >= 30 ? "#7abf9a" : "#777") : "#333" }}>
+                        {stock.roe !== null ? `${fmt(stock.roe)}%` : "—"}
                       </span>
                     </td>
 
                     {/* Profit Margin */}
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                      <span style={{
-                        fontSize: 12, fontVariantNumeric: "tabular-nums",
-                        color: stock.profitMargin >= 20 ? "#7abf9a" : "#777",
-                      }}>
-                        {fmt(stock.profitMargin)}%
+                      <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: stock.profitMargin !== null ? (stock.profitMargin >= 20 ? "#7abf9a" : "#777") : "#333" }}>
+                        {stock.profitMargin !== null ? `${fmt(stock.profitMargin)}%` : "—"}
                       </span>
                     </td>
 
                     {/* Revenue Growth */}
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                      <span style={{
-                        fontSize: 12, fontVariantNumeric: "tabular-nums",
-                        color: growthColor(stock.revenueGrowth),
-                      }}>
-                        {stock.revenueGrowth >= 0 ? "+" : ""}{fmt(stock.revenueGrowth)}%
+                      <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: signColor(stock.revenueGrowth) }}>
+                        {stock.revenueGrowth !== null
+                          ? `${stock.revenueGrowth >= 0 ? "+" : ""}${fmt(stock.revenueGrowth)}%`
+                          : "—"}
                       </span>
                     </td>
 
-                    {/* Athena Score — visually dominant */}
+                    {/* Dividend Yield */}
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: stock.dividendYield !== null && stock.dividendYield >= 3 ? "#7abf9a" : "#777" }}>
+                        {stock.dividendYield !== null && stock.dividendYield > 0
+                          ? `${fmt(stock.dividendYield)}%`
+                          : "—"}
+                      </span>
+                    </td>
+
+                    {/* EPS Growth */}
+                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: signColor(stock.epsGrowth) }}>
+                        {stock.epsGrowth !== null
+                          ? `${stock.epsGrowth >= 0 ? "+" : ""}${fmt(stock.epsGrowth)}%`
+                          : "—"}
+                      </span>
+                    </td>
+
+                    {/* Athena's Take — insight */}
+                    <td style={{ padding: "14px 20px", minWidth: 220 }}>
                       <span style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        width: 34, height: 34, borderRadius: 8,
-                        background: `${scoreColor(stock.athenaScore)}14`,
-                        border:     `1px solid ${scoreColor(stock.athenaScore)}35`,
-                        color:       scoreColor(stock.athenaScore),
-                        fontFamily: "'Cinzel', serif",
-                        fontSize:   15, fontWeight: 700,
+                        fontSize: 10.5,
+                        color: "#5a5030",
+                        fontStyle: "italic",
+                        letterSpacing: "0.01em",
+                        lineHeight: 1.4,
                       }}>
-                        {stock.athenaScore}
+                        {stock.insight}
                       </span>
                     </td>
                   </tr>
@@ -531,7 +750,7 @@ export default function ScreenerClient() {
 
       {/* Footer note */}
       <p style={{ fontSize: 9, color: "#222", letterSpacing: "0.15em", textTransform: "uppercase", textAlign: "center", paddingBottom: 4 }}>
-        Simulated data · Athena Screener · For educational purposes only
+        Live data via Yahoo Finance · Click any stock to get the full AI analysis · For educational purposes only
       </p>
 
     </div>

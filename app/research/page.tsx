@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import NavLink from "@/components/NavLink";
 import TickerInput from "@/components/TickerInput";
-import LanguageSelector from "@/components/LanguageSelector";
 import ResearchHoverCard from "@/components/ResearchHoverCard";
 import { RESEARCH_ARTICLES } from "@/lib/research-data";
+import { fetchSimpleQuotes } from "@/lib/yahoo";
 
 export const metadata: Metadata = {
-  title: "Research — Athena AI",
+  title: "Research",
   description:
     "AI-curated market intelligence for long-term investors. Sector insights, earnings watch, macro briefings, and deep research.",
 };
@@ -180,7 +181,91 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function ResearchPage() {
+export default async function ResearchPage() {
+  // ── Fetch live market data ─────────────────────────────────────────────────
+  const quotes = await fetchSimpleQuotes([
+    "SPY", "^VIX",
+    "XLK", "XLC", "XLY", "XLF", "XLI", "XLB", "XLV", "XLP", "XLRE", "XLU", "XLE",
+  ]);
+
+  const vixPrice     = quotes["^VIX"]?.price ?? 20;
+  const spyChangePct = quotes["SPY"]?.changePct ?? 0;
+
+  // Compute live regime score (same formula as markets page)
+  let vixPts: number;
+  if (vixPrice < 12)       vixPts = 55;
+  else if (vixPrice < 15)  vixPts = 46;
+  else if (vixPrice < 18)  vixPts = 36;
+  else if (vixPrice < 22)  vixPts = 24;
+  else if (vixPrice < 27)  vixPts = 12;
+  else if (vixPrice < 35)  vixPts = 4;
+  else                     vixPts = 0;
+
+  let spyPts: number;
+  if (spyChangePct > 2)         spyPts = 45;
+  else if (spyChangePct > 1)    spyPts = 36;
+  else if (spyChangePct > 0.3)  spyPts = 26;
+  else if (spyChangePct > -0.3) spyPts = 18;
+  else if (spyChangePct > -1)   spyPts = 10;
+  else if (spyChangePct > -2)   spyPts = 4;
+  else                          spyPts = 0;
+
+  const liveScore = Math.min(100, Math.max(0, vixPts + spyPts));
+
+  const liveRegimeLabel =
+    liveScore >= 80 ? "Risk-On" :
+    liveScore >= 60 ? "Constructive" :
+    liveScore >= 40 ? "Neutral" :
+    liveScore >= 20 ? "Defensive" : "Risk-Off";
+
+  const liveMacro =
+    liveScore >= 60
+      ? `Technology leadership continues as AI infrastructure spending remains strong. Bond yields stable, credit spreads tight — risk appetite intact. VIX at ${vixPrice.toFixed(1)} confirms a low-fear environment.`
+      : liveScore >= 40
+      ? `Market environment mixed with sectors rotating defensively. VIX at ${vixPrice.toFixed(1)} indicates elevated caution. Balanced positioning recommended until trend clarifies.`
+      : `Risk-off signals dominate — VIX elevated at ${vixPrice.toFixed(1)}, defensives outperforming. Capital preservation priority; monitor credit spreads and Fed commentary for re-entry signals.`;
+
+  // Derive sector trends from live ETF performance
+  function getSectorTrend(sym: string): "bullish" | "neutral" | "bearish" {
+    const pct = quotes[sym]?.changePct ?? 0;
+    if (pct > 0.5)  return "bullish";
+    if (pct < -0.5) return "bearish";
+    return "neutral";
+  }
+
+  const LIVE_SECTORS: SectorCard[] = [
+    {
+      name: "Technology",
+      trend: getSectorTrend("XLK"),
+      insight: "AI infrastructure demand accelerating across hyperscalers; momentum in semis and cloud.",
+    },
+    {
+      name: "Healthcare",
+      trend: getSectorTrend("XLV"),
+      insight: "Defensive positioning improving as GLP-1 drug cycle reshapes pharma revenue.",
+    },
+    {
+      name: "Financials",
+      trend: getSectorTrend("XLF"),
+      insight: "Margins shaped by yield curve dynamics; net interest income key metric to watch.",
+    },
+    {
+      name: "Energy",
+      trend: getSectorTrend("XLE"),
+      insight: "Demand uncertainty weighing on crude; geopolitical premium fading.",
+    },
+    {
+      name: "Consumer Disc.",
+      trend: getSectorTrend("XLY"),
+      insight: "Resilient spending data supports premium brands; travel and leisure outperforming.",
+    },
+    {
+      name: "Industrials",
+      trend: getSectorTrend("XLI"),
+      insight: "Re-shoring tailwind intact but order books softening into H2 2026.",
+    },
+  ];
+
   return (
     <div className="relative flex-1 bg-black flex flex-col">
       {/* Top glow */}
@@ -214,33 +299,11 @@ export default function ResearchPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-6">
-          <LanguageSelector />
           <nav className="hidden md:flex items-center gap-5">
-            <Link
-              href="/markets"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Markets
-            </Link>
-            <Link
-              href="/screener"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Screener
-            </Link>
-            <Link
-              href="/research"
-              className="text-[11px] tracking-widest uppercase font-semibold transition-colors duration-200"
-              style={{ color: "#d4a017" }}
-            >
-              Research
-            </Link>
-            <Link
-              href="/portfolio"
-              className="text-[11px] text-[#666] hover:text-[#d4a017] tracking-widest uppercase font-medium transition-colors duration-200"
-            >
-              Portfolio
-            </Link>
+            <NavLink href="/markets"   label="Markets"   tooltip="Live market intelligence" />
+            <NavLink href="/screener"  label="Screener"  tooltip="Discover quality stocks"   />
+            <NavLink href="/research"  label="Research"  tooltip="AI market insights"       active />
+            <NavLink href="/portfolio" label="Portfolio" tooltip="Track your holdings"      />
           </nav>
           <Link
             href="/"
@@ -278,7 +341,7 @@ export default function ResearchPage() {
             </p>
           </div>
 
-          {/* Simulated badge */}
+          {/* Live badge */}
           <span
             className="shrink-0"
             style={{
@@ -287,10 +350,10 @@ export default function ResearchPage() {
               gap: 6,
               padding: "4px 12px",
               borderRadius: 20,
-              border: "1px solid rgba(212,160,23,0.2)",
-              background: "rgba(212,160,23,0.05)",
+              border: "1px solid rgba(74,222,128,0.2)",
+              background: "rgba(74,222,128,0.05)",
               fontSize: 9,
-              color: "#8a6820",
+              color: "#4ade80",
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               fontWeight: 600,
@@ -301,12 +364,12 @@ export default function ResearchPage() {
                 width: 5,
                 height: 5,
                 borderRadius: "50%",
-                background: "#8a6820",
+                background: "#4ade80",
                 display: "inline-block",
-                opacity: 0.7,
+                opacity: 0.85,
               }}
             />
-            Simulated Intelligence
+            Live · 15min delay
           </span>
         </div>
 
@@ -350,7 +413,7 @@ export default function ResearchPage() {
                   textTransform: "uppercase",
                 }}
               >
-                {MARKET_BRIEF.regime} · {MARKET_BRIEF.regimeScore}
+                {liveRegimeLabel} · {liveScore}
               </span>
             </div>
 
@@ -359,7 +422,7 @@ export default function ResearchPage() {
               className="mb-8 leading-relaxed"
               style={{ fontSize: "0.92rem", color: "#bbb", maxWidth: 620 }}
             >
-              {MARKET_BRIEF.macro}
+              {liveMacro}
             </p>
 
             {/* Signal rows */}
@@ -418,7 +481,7 @@ export default function ResearchPage() {
           <SectionLabel>Sector Intelligence</SectionLabel>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {SECTORS.map((sector) => (
+            {LIVE_SECTORS.map((sector) => (
               <div
                 key={sector.name}
                 className="p-5 rounded-2xl flex flex-col gap-3"
@@ -571,7 +634,7 @@ export default function ResearchPage() {
               letterSpacing: "0.1em",
             }}
           >
-            Dates approximate · Simulated data
+            Dates approximate · Verify with investor relations
           </p>
         </div>
 
@@ -593,8 +656,7 @@ export default function ResearchPage() {
           className="text-center text-[9px] tracking-[0.22em] uppercase"
           style={{ color: "#2a2a2a" }}
         >
-          Simulated intelligence · For illustrative purposes only · Not
-          financial advice
+          Market data via Yahoo Finance · 15-min delay · For informational purposes only · Not financial advice
         </p>
       </main>
     </div>

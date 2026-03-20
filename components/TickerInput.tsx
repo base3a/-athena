@@ -120,19 +120,18 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
             onKeyDown={handleKeyDown}
             placeholder={
               compact
-                ? "Ticker or company (AAPL, NVDA…)"
-                : "Search company or ticker (Tesla, AAPL)"
+                ? "Enter a ticker or company name"
+                : "Enter any company or ticker symbol"
             }
             maxLength={40}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="characters"
             spellCheck={false}
-            className={`flex-1 bg-[#111] text-white placeholder-[#444] px-4
-                       text-sm font-medium tracking-widest uppercase outline-none
-                       transition-colors duration-200 ${compact ? "py-2.5" : "py-4"}`}
+            suppressHydrationWarning
+            className={`flex-1 bg-[#111] text-white placeholder-[#444] px-4 text-sm font-medium tracking-widest uppercase outline-none transition-colors duration-200 ${compact ? "py-2.5" : "py-4"}`}
             style={{
-              letterSpacing: query ? "0.15em" : "0.05em",
+              letterSpacing: "0.05em",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -143,9 +142,8 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
           <button
             type="submit"
             disabled={!query.trim()}
-            className={`relative font-semibold text-sm tracking-widest uppercase
-                       transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed
-                       overflow-hidden group ${compact ? "px-5 py-2.5" : "px-7"}`}
+            suppressHydrationWarning
+            className={`relative font-semibold text-sm tracking-widest uppercase transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden group ${compact ? "px-5 py-2.5" : "px-4 sm:px-7"}`}
             style={{
               background: "linear-gradient(135deg, #d4af37 0%, #c9a227 100%)",
               color: "#000",
@@ -260,10 +258,11 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
             Get a full AI stock analysis in seconds.
           </p>
           <p className="text-center text-[11px] tracking-widest uppercase" style={{ color: "#555" }}>
-            NYSE &bull; NASDAQ &bull; S&amp;P 500 &bull; Global Markets
+            NYSE &bull; NASDAQ &bull; LSE &bull; TSE &bull; Global Exchanges
           </p>
         </div>
       )}
+
     </div>
   );
 }
