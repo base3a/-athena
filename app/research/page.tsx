@@ -188,6 +188,21 @@ export default async function ResearchPage() {
     "XLK", "XLC", "XLY", "XLF", "XLI", "XLB", "XLV", "XLP", "XLRE", "XLU", "XLE",
   ]);
 
+  // Fetch live earnings calendar
+  let liveEarnings: Array<{ ticker: string; company: string; date: string; hour: string }> = [];
+  try {
+    const earningsRes = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/earnings-calendar`,
+      { next: { revalidate: 3600 } },
+    );
+    if (earningsRes.ok) {
+      const earningsData = await earningsRes.json();
+      liveEarnings = earningsData.earnings ?? [];
+    }
+  } catch {
+    // fall through to static data
+  }
+
   const vixPrice     = quotes["^VIX"]?.price ?? 20;
   const spyChangePct = quotes["SPY"]?.changePct ?? 0;
 
@@ -546,13 +561,22 @@ export default async function ResearchPage() {
             className="rounded-2xl overflow-hidden"
             style={{ background: "#0a0a0a", border: "1px solid #1a1a1a" }}
           >
-            {EARNINGS.map((ev, i) => (
+            {(liveEarnings.length > 0
+              ? liveEarnings.map((e) => ({
+                  ticker:     e.ticker,
+                  company:    e.company,
+                  date:       new Date(e.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                  insight:    EARNINGS.find((s) => s.ticker === e.ticker)?.insight ?? "Monitor earnings for results vs. consensus estimates.",
+                  importance: (EARNINGS.find((s) => s.ticker === e.ticker)?.importance ?? "medium") as "high" | "medium",
+                }))
+              : EARNINGS
+            ).map((ev, i) => (
               <div
                 key={ev.ticker}
                 className="flex items-start gap-5 px-6 py-5"
                 style={{
                   borderBottom:
-                    i < EARNINGS.length - 1 ? "1px solid #141414" : "none",
+                    i < (liveEarnings.length > 0 ? liveEarnings.length : EARNINGS.length) - 1 ? "1px solid #141414" : "none",
                 }}
               >
                 {/* Importance dot */}

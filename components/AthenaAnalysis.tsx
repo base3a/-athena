@@ -222,6 +222,8 @@ const SECTION_LABELS: Record<number, string> = {
   11: "Confidence Score",
   12: "Final Verdict",
   13: "What Would Change This?",
+  14: "Institutional Conviction",
+  15: "The Right Price",
 };
 
 // ── Content helpers ────────────────────────────────────────────────────────────
@@ -407,6 +409,181 @@ TIMEFRAME: ${horizonLabel}
 ### 13. What Would Change This?
 ${changeThesis}
 `;
+}
+
+// ── Valuation History ──────────────────────────────────────────────────────────
+interface ValHistData {
+  peCurrent: number | null;
+  pe3Y: number | null;
+  pe5Y: number | null;
+  psCurrent: number | null;
+  ps3Y: number | null;
+  ps5Y: number | null;
+  evEbitdaCurrent: number | null;
+  evEbitda3Y: number | null;
+  evEbitda5Y: number | null;
+}
+
+function ValuationHistory({
+  symbol,
+  peFallback,
+  psFallback,
+}: {
+  symbol:    string;
+  peFallback: number | null;
+  psFallback: number | null;
+}) {
+  const [data, setData]     = useState<ValHistData | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/valuation-history?symbol=${encodeURIComponent(symbol)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setData({
+          peCurrent:       d.peCurrent       ?? peFallback,
+          pe3Y:            d.pe3Y            ?? null,
+          pe5Y:            d.pe5Y            ?? null,
+          psCurrent:       d.psCurrent       ?? psFallback,
+          ps3Y:            d.ps3Y            ?? null,
+          ps5Y:            d.ps5Y            ?? null,
+          evEbitdaCurrent: d.evEbitdaCurrent ?? null,
+          evEbitda3Y:      d.evEbitda3Y      ?? null,
+          evEbitda5Y:      d.evEbitda5Y      ?? null,
+        });
+      })
+      .catch(() => setData(null))
+      .finally(() => setLoaded(true));
+  }, [symbol, peFallback, psFallback]);
+
+  const fmtX = (n: number | null): string =>
+    n !== null ? `${n.toFixed(1)}x` : "—";
+
+  const vsHistory = (
+    current: number | null,
+    avg5Y:   number | null,
+    avg3Y:   number | null,
+  ): { text: string; color: string } | null => {
+    const ref = avg5Y ?? avg3Y;
+    if (current === null || ref === null) return null;
+    if (current < ref * 0.92) return { text: "↓ Cheaper",   color: "#4ade80" };
+    if (current > ref * 1.08) return { text: "↑ Expensive", color: "#f87171" };
+    return { text: "≈ In Line", color: "#888" };
+  };
+
+  if (!loaded) {
+    return (
+      <div
+        className="rounded-2xl p-5 md:p-6"
+        style={{
+          background: "#0b0b0b",
+          border:     "1px solid rgba(212,175,55,0.12)",
+          boxShadow:  "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}
+      >
+        <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-4">Historical Valuation</p>
+        <div
+          className="rounded-xl"
+          style={{
+            height:          120,
+            background:      "linear-gradient(90deg, #0a0a0a 0%, #131100 50%, #0a0a0a 100%)",
+            backgroundSize:  "200% 100%",
+            animation:       "shimmer 2.4s ease-in-out infinite",
+          }}
+        />
+      </div>
+    );
+  }
+
+  const metrics = [
+    {
+      label:   "P/E Ratio",
+      current: data?.peCurrent ?? peFallback,
+      y3:      data?.pe3Y,
+      y5:      data?.pe5Y,
+    },
+    {
+      label:   "P/S Ratio",
+      current: data?.psCurrent ?? psFallback,
+      y3:      data?.ps3Y,
+      y5:      data?.ps5Y,
+    },
+    {
+      label:   "EV/EBITDA",
+      current: data?.evEbitdaCurrent,
+      y3:      data?.evEbitda3Y,
+      y5:      data?.evEbitda5Y,
+    },
+  ];
+
+  const hasData = metrics.some((m) => m.current !== null);
+  if (!hasData) return null;
+
+  return (
+    <div
+      className="rounded-2xl p-5 md:p-6"
+      style={{
+        background: "#0b0b0b",
+        border:     "1px solid rgba(212,175,55,0.12)",
+        boxShadow:  "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-4">
+        Historical Valuation Comparison
+      </p>
+
+      <div className="overflow-x-auto">
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              {(["Metric", "Current", "3Y Avg", "5Y Avg", "vs History"] as const).map((h, i) => (
+                <th
+                  key={h}
+                  style={{
+                    textAlign:     i === 0 ? "left" : "right",
+                    fontSize:      9,
+                    color:         i === 1 ? "#d4a017" : "#555",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    paddingBottom: 10,
+                    fontWeight:    600,
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m, i) => {
+              const tag = vsHistory(m.current ?? null, m.y5 ?? null, m.y3 ?? null);
+              return (
+                <tr key={i} style={{ borderTop: "1px solid #1a1a1a" }}>
+                  <td style={{ fontSize: 12, color: "#999", padding: "10px 0", paddingRight: 16 }}>{m.label}</td>
+                  <td style={{ textAlign: "right", fontSize: 13, color: "#e8e8e8", fontWeight: 600, fontVariantNumeric: "tabular-nums", padding: "10px 0" }}>
+                    {fmtX(m.current ?? null)}
+                  </td>
+                  <td style={{ textAlign: "right", fontSize: 12, color: "#666", fontVariantNumeric: "tabular-nums", padding: "10px 0" }}>
+                    {fmtX(m.y3 ?? null)}
+                  </td>
+                  <td style={{ textAlign: "right", fontSize: 12, color: "#666", fontVariantNumeric: "tabular-nums", padding: "10px 0" }}>
+                    {fmtX(m.y5 ?? null)}
+                  </td>
+                  <td style={{ textAlign: "right", fontSize: 10, color: tag?.color ?? "#555", padding: "10px 0", whiteSpace: "nowrap", paddingLeft: 12 }}>
+                    {tag?.text ?? "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[9px] mt-3" style={{ color: "#2a2a2a" }}>
+        Historical averages sourced from Finnhub · Shown where available
+      </p>
+    </div>
+  );
 }
 
 // ── Loading card ───────────────────────────────────────────────────────────────
@@ -1508,6 +1685,17 @@ function Toast({ message }: { message: string }) {
   );
 }
 
+// ── Currency symbol helper ─────────────────────────────────────────────────────
+function currencySymbol(code: string): string {
+  const MAP: Record<string, string> = {
+    USD: "$", EUR: "€", GBP: "£", JPY: "¥",
+    CAD: "C$", AUD: "A$", HKD: "HK$", CHF: "Fr",
+    KRW: "₩", INR: "₹", SEK: "kr", NOK: "kr",
+    DKK: "kr", SGD: "S$", CNY: "¥", TWD: "NT$",
+  };
+  return MAP[code?.toUpperCase()] ?? code ?? "$";
+}
+
 // ── Data Panel helpers ─────────────────────────────────────────────────────────
 function parseSafe(val: string | undefined | null): number | null {
   if (!val || val === "None" || val === "-") return null;
@@ -1791,7 +1979,7 @@ function FundamentalPanel({
         />
         <DataRow
           label="EPS (TTM)"
-          value={eps !== null ? `$${eps.toFixed(2)}` : "—"}
+          value={eps !== null ? `${currencySymbol(overview.Currency)}${eps.toFixed(2)}` : "—"}
           positive={eps !== null && eps > 0}
           negative={eps !== null && eps < 0}
         />
@@ -2823,6 +3011,17 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           <StockChart symbol={overview.Symbol} />
 
           {/* ══════════════════════════════════════════════
+              2.5 HISTORICAL VALUATION COMPARISON
+          ══════════════════════════════════════════════ */}
+          {phase === "done" && (
+            <ValuationHistory
+              symbol={overview.Symbol}
+              peFallback={parseSafe(overview.PERatio)}
+              psFallback={null}
+            />
+          )}
+
+          {/* ══════════════════════════════════════════════
               3. RECENT NEWS
           ══════════════════════════════════════════════ */}
           <StockNews symbol={overview.Symbol} />
@@ -2914,7 +3113,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
             >
               <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "#1a1a1a" }}>
                 <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase">
-                  Deep Dive — 13-Point Analysis
+                  Deep Dive — 15-Point Analysis
                 </p>
                 <p className="text-[9px] text-[#888] tracking-widest uppercase">
                   Click to expand
@@ -2931,7 +3130,7 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
                   />
                 ))}
 
-                {isStreaming && sections.length < 13 && (
+                {isStreaming && sections.length < 15 && (
                   <div
                     className="px-4 py-3.5 rounded-xl flex items-center gap-3"
                     style={{ background: "#080808", border: "1px solid #111" }}

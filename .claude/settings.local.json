@@ -48,7 +48,15 @@
       "Bash(chmod -R 755 /Users/basirali/Desktop/Athena/.next)",
       "Bash(node_modules/.bin/next dev --help)",
       "Bash(node -e \"console.log\\(require\\(''./node_modules/next/package.json''\\).version\\)\")",
-      "Bash(grep -r \"Score\\\\|VERDICT\\\\|verdict\" /Users/basirali/Desktop/Athena/lib/*.ts)"
+      "Bash(grep -r \"Score\\\\|VERDICT\\\\|verdict\" /Users/basirali/Desktop/Athena/lib/*.ts)",
+      "Bash(cat app/analyze/[ticker]/page.tsx)",
+      "Bash(ls /Users/basirali/Desktop/Athena/app/favicon* /Users/basirali/Desktop/Athena/public/favicon*)",
+      "Bash(ls /Users/basirali/Desktop/Athena/app/analyze/[ticker]/)",
+      "Bash(find .next -name *.lock -delete)",
+      "Bash(rm -rf .next)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

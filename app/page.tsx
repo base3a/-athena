@@ -7,6 +7,7 @@ import FeatureCards from "@/components/FeatureCards";
 import FeaturedAnalysis from "@/components/FeaturedAnalysis";
 import PopularAnalyses from "@/components/PopularAnalyses";
 import MarketBrief from "@/components/MarketBrief";
+import MarketPulse from "@/components/MarketPulse";
 import MobileNav from "@/components/MobileNav";
 import ValueProp from "@/components/ValueProp";
 import MarketNews from "@/components/MarketNews";
@@ -205,6 +206,9 @@ export default function HomePage() {
 
         {/* Market Brief — daily habit loop */}
         <MarketBrief />
+
+        {/* Market Pulse — live sector snapshot */}
+        <MarketPulse />
 
         {/* Stats — 2-col mobile, 4-col desktop */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-8 w-full max-w-[900px]">

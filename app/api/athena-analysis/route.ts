@@ -111,9 +111,9 @@ CRITICAL RULES — these override everything else:
    Example: a stock with an AVOID verdict due to extreme valuation but meaningful bull-case optionality should score 6–7, not 2.
 These values come from Athena's shared scoring formula so they are consistent across all pages of the platform.
 
-Answer the following 13 investment framework questions. Keep each answer to 2-4 sentences. Reference specific numbers wherever relevant.
+Answer the following 15 investment framework questions. Keep each answer to 2-4 sentences. Reference specific numbers wherever relevant.
 
-IMPORTANT: Output Section 12 (Final Verdict) FIRST, then Section 11 (Confidence Score), then Sections 1–10 in order, then Section 13. This allows the verdict to appear immediately. Do not change the section numbers — only the output order.
+IMPORTANT: Output Section 12 (Final Verdict) FIRST, then Section 11 (Confidence Score), then Sections 1–10 in order, then Sections 13, 14, 15. This allows the verdict to appear immediately. Do not change the section numbers — only the output order.
 
 RESPOND EXACTLY IN THIS FORMAT — do not add extra text before or after:
 
@@ -171,7 +171,13 @@ RISK_SCORE: [integer 1-10, where 10 = very low risk / safe, 1 = extremely high r
 [What is the single most important event in the next 12 months that could move this stock significantly? Be as specific as possible — name the event, earnings cycle, product launch, or regulatory milestone to watch.]
 
 ### 13. What Would Change This Verdict?
-[Give exactly 2-3 concrete, measurable financial triggers that would cause you to change the verdict. For example: "If revenue growth exceeds 20% for two consecutive quarters" or "If operating margin falls below 10%." Be specific — no vague statements.]`;
+[Give exactly 2-3 concrete, measurable financial triggers that would cause you to change the verdict. For example: "If revenue growth exceeds 20% for two consecutive quarters" or "If operating margin falls below 10%." Be specific — no vague statements.]
+
+### 14. Institutional Conviction
+[Are major institutions buying or selling this stock? Describe what institutional ownership typically means for this type of company (large-cap vs small-cap, sector). If the stock is well-covered by Wall Street, mention what institutional conviction signals. Be specific about what institutional activity would validate or invalidate the investment case. Reference any ownership concentration risks.]
+
+### 15. The Right Price
+[At what specific price would this stock become compelling to buy regardless of current verdict? Calculate a target entry price using: (1) EPS × fair sector P/E multiple, and (2) a 20-30% discount to analyst consensus target. State the exact dollar figure. What single catalyst would most likely cause Athena to upgrade the verdict? Be concrete — name the specific metric, event, or threshold that would change the analysis.]`;
 }
 
 // ── DeepSeek SSE parser ───────────────────────────────────────────────────────
