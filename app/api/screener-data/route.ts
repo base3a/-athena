@@ -28,6 +28,8 @@ export interface ScreenerMetrics {
   pb:            number | null;  // Price-to-book ratio
   epsGrowth:     number | null;  // Earnings growth YoY, %
   marketCapCat:  "Large" | "Mid" | "Small" | null;
+  price:         number | null;  // Current market price
+  high52w:       number | null;  // 52-week high
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -56,19 +58,27 @@ function marketCapCategory(cap: number | null | undefined): "Large" | "Mid" | "S
 const EMPTY: ScreenerMetrics = {
   pe: null, roe: null, profitMargin: null, revenueGrowth: null,
   dividendYield: null, debtToEquity: null, pb: null, epsGrowth: null,
-  marketCapCat: null,
+  marketCapCat: null, price: null, high52w: null,
 };
 
 async function fetchMetrics(ticker: string): Promise<ScreenerMetrics> {
   try {
-    // yahoo-finance2 quoteSummary with the modules we need
-    const q = await yahooFinance.quoteSummary(ticker, {
-      modules: ["financialData", "defaultKeyStatistics", "summaryDetail"],
+    // yahoo-finance2 quoteSummary with the modules we need.
+    // yahooFinance is cast as `typeof YahooFinanceLib` (the class, not an instance),
+    // so its conditional return type resolves to `never` for instance methods.
+    // We cast the result to `any` here; all downstream accesses use optional
+    // chaining so runtime safety is preserved.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q: any = await yahooFinance.quoteSummary(ticker, {
+      modules: ["financialData", "defaultKeyStatistics", "summaryDetail"] as const,
     });
 
-    const fd  = q.financialData;
-    const ks  = q.defaultKeyStatistics;
-    const sd  = q.summaryDetail;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fd: any = q?.financialData;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ks: any = q?.defaultKeyStatistics;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sd: any = q?.summaryDetail;
 
     // P/E — cap nonsensical values
     const peRaw = sd?.trailingPE ?? ks?.trailingPE ?? null;
@@ -92,7 +102,12 @@ async function fetchMetrics(ticker: string): Promise<ScreenerMetrics> {
     // Market cap categorisation
     const marketCapCat = marketCapCategory(sd?.marketCap);
 
-    return { pe, roe, profitMargin, revenueGrowth, dividendYield, debtToEquity, pb, epsGrowth, marketCapCat };
+    // Current price — try financialData.currentPrice first, then summaryDetail fallbacks
+    const priceRaw = fd?.currentPrice ?? sd?.regularMarketPrice ?? sd?.previousClose ?? null;
+    const price    = priceRaw != null ? r1(priceRaw) : null;
+    const high52w  = sd?.fiftyTwoWeekHigh != null ? r1(sd.fiftyTwoWeekHigh) : null;
+
+    return { pe, roe, profitMargin, revenueGrowth, dividendYield, debtToEquity, pb, epsGrowth, marketCapCat, price, high52w };
   } catch {
     return EMPTY;
   }

@@ -65,8 +65,8 @@ export default function SiteFooter() {
 
         {/* ── Disclaimer ── */}
         <p className="text-[10px] text-[#2a2a2a] leading-relaxed tracking-wide text-center max-w-3xl mx-auto">
-          Athena provides informational analysis only. This platform does not provide financial advice.
-          Investing involves risk and past performance does not guarantee future results.
+          Athena provides informational analysis only and does not constitute financial advice.
+          Investing involves risk; past performance does not guarantee future results.
         </p>
 
       </div>

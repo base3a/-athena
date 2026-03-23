@@ -64,10 +64,14 @@ export default async function MarketBrief() {
           </span>
           {regime.score != null && (
             <span
-              className="text-[11px] font-bold"
-              style={{ fontFamily: "'Cinzel', serif", color: regime.color }}
+              className="text-[10px] tracking-wide"
+              style={{ color: "#555" }}
+              title={`Athena composite fear/greed index — 0 (extreme fear) to 100 (extreme greed)`}
             >
-              {regime.score}
+              · Score:&nbsp;
+              <span style={{ color: regime.color, fontWeight: 600 }}>
+                {regime.score}
+              </span>
             </span>
           )}
         </div>

@@ -1,0 +1,9 @@
+{
+  "_note": "Schema definition for the Athena verdict cache. Runtime verdicts are persisted in localStorage under the key 'athena_verdict_cache' (browser) so they survive page reloads on any deployment platform. This file defines the expected shape of each entry.",
+  "_schema": {
+    "symbol":    "string  — uppercase ticker, e.g. AAPL",
+    "verdict":   "BUY | HOLD | WATCH | AVOID",
+    "updatedAt": "number  — Unix ms timestamp of when the AI analysis completed"
+  },
+  "_tickers": ["NVDA", "AAPL", "TSLA", "MSFT", "ASML"]
+}

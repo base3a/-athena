@@ -49,14 +49,18 @@ export async function GET() {
     const articles: FinnhubArticle[] = await res.json();
 
     const filtered: NewsArticle[] = articles
-      // Remove articles with missing or very short content
-      .filter(
-        (a) =>
-          a.headline &&
-          a.headline.trim().length > 15 &&
-          a.summary  &&
-          a.summary.trim().length  > 20,
-      )
+      // Remove articles with missing or very short content, and filter out
+      // articles where the summary is just the headline echoed back (sometimes
+      // Finnhub returns summary = "Headline text  SourceName" as a fallback).
+      .filter((a) => {
+        if (!a.headline || a.headline.trim().length <= 15) return false;
+        if (!a.summary  || a.summary.trim().length  <= 20)  return false;
+        // Drop if summary starts with the headline (duplicate text bug)
+        const hl  = a.headline.trim().toLowerCase();
+        const sum = a.summary.trim().toLowerCase();
+        if (sum.startsWith(hl)) return false;
+        return true;
+      })
       .slice(0, 4)
       .map((a) => ({
         id:       a.id,

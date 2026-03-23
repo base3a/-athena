@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
 
   title: {
-    default: "Athena — AI Stock Analysis Tool",
+    default: "Athena — AI-Powered Stock Analysis Tool",
     template: "%s | Athena AI",
   },
 

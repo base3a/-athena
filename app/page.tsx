@@ -102,9 +102,10 @@ export default function HomePage() {
           </p>
 
           {/* Tagline */}
-          <p className="mb-10 text-[#888] text-sm max-w-md leading-relaxed font-normal tracking-wide">
+          <p className="mb-1 text-[#999] text-sm font-normal tracking-wide">
             Institutional-grade intelligence for every investor.
-            <br />
+          </p>
+          <p className="mb-10 text-[#666] text-sm font-normal tracking-wide">
             Enter any ticker to receive a complete AI-driven investment analysis.
           </p>
 

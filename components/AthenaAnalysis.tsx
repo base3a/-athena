@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo, useRef, type ReactNode } from "react";
 import type { StockOverview, GlobalQuote } from "@/lib/alphaVantage";
 import { getStoredLang } from "@/components/LanguageSelector";
 import ShareButton from "@/components/ShareButton";
@@ -1534,11 +1534,13 @@ function DataRow({
   value,
   positive,
   negative,
+  badge,
 }: {
   label: string;
   value: string;
   positive?: boolean;
   negative?: boolean;
+  badge?: { text: string; color: string };
 }) {
   const color = positive ? "#7abf9a" : negative ? "#c47878" : "#aaa";
   return (
@@ -1547,8 +1549,27 @@ function DataRow({
       style={{ borderColor: "#1a1a1a" }}
     >
       <span className="text-[11px] text-[#666] tracking-wide">{label}</span>
-      <span className="text-[12px] font-medium" style={{ color }}>{value}</span>
+      <span className="flex items-center gap-2">
+        <span className="text-[12px] font-medium" style={{ color }}>{value}</span>
+        {badge && (
+          <span
+            className="text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded"
+            style={{ color: badge.color, background: `${badge.color}18`, border: `1px solid ${badge.color}30` }}
+          >
+            {badge.text}
+          </span>
+        )}
+      </span>
     </div>
+  );
+}
+
+// ── DataGroupHeader ─────────────────────────────────────────────────────────────
+function DataGroupHeader({ title }: { title: string }) {
+  return (
+    <p className="text-[9px] text-[#d4a017] tracking-[0.28em] uppercase mt-4 mb-0.5 first:mt-0 font-semibold opacity-80">
+      {title}
+    </p>
   );
 }
 
@@ -1711,28 +1732,49 @@ function FundamentalPanel({
   isOpen: boolean;
   onToggle: () => void;
 }) {
-  const rev      = parseSafe(overview.RevenueTTM);
-  const margin   = parseSafe(overview.ProfitMargin);
-  const opMargin = parseSafe(overview.OperatingMarginTTM);
-  const roe      = parseSafe(overview.ReturnOnEquityTTM);
-  const eps      = parseSafe(overview.EPS);
-  const pe       = parseSafe(overview.PERatio);
-  const divYield = parseSafe(overview.DividendYield);
+  // Income Statement
+  const rev       = parseSafe(overview.RevenueTTM);
+  const gp        = parseSafe(overview.GrossProfitTTM);
+  const margin    = parseSafe(overview.ProfitMargin);
+  const opMargin  = parseSafe(overview.OperatingMarginTTM);
+  const eps       = parseSafe(overview.EPS);
+  const grossMgn  = rev !== null && gp !== null && rev > 0 ? gp / rev : null;
+
+  // Balance Sheet
+  const de        = parseSafe(overview.DebtToEquity);
+  const mcap      = parseSafe(overview.MarketCapitalization);
+  const shares    = parseSafe(overview.SharesOutstanding);
+
+  // Returns
+  const roe       = parseSafe(overview.ReturnOnEquityTTM);
+  const roa       = parseSafe(overview.ReturnOnAssetsTTM);
+  const divYield  = parseSafe(overview.DividendYield);
+  const divPS     = parseSafe(overview.DividendPerShare);
+
+  // Valuation
+  const pe        = parseSafe(overview.PERatio);
+  const fpe       = parseSafe(overview.ForwardPE);
+  const peg       = parseSafe(overview.PEGRatio);
+  const target    = parseSafe(overview.AnalystTargetPrice);
 
   const previewLine =
     rev !== null
-      ? `Revenue ${fmtLargeNum(rev)} · Margin ${margin !== null ? fmtPct(margin) : "—"}`
-      : "Revenue, margins, profitability metrics";
+      ? `Revenue ${fmtLargeNum(rev)} · Net Margin ${margin !== null ? fmtPct(margin) : "—"} · ROE ${roe !== null ? fmtPct(roe) : "—"}`
+      : "Income statement, balance sheet, returns, valuation";
 
   return (
     <DataPanel icon="F" title="Fundamental Data" isOpen={isOpen} onToggle={onToggle} previewLine={previewLine}>
       <div className="flex flex-col">
-        <DataRow label="Revenue (TTM)"     value={fmtLargeNum(rev)} />
+
+        {/* ── Income Statement ── */}
+        <DataGroupHeader title="Income Statement" />
+        <DataRow label="Revenue (TTM)"       value={fmtLargeNum(rev)} />
+        <DataRow label="Gross Profit (TTM)"  value={fmtLargeNum(gp)} />
         <DataRow
-          label="Profit Margin"
-          value={margin   !== null ? fmtPct(margin)   : "—"}
-          positive={margin   !== null && margin   > 0.10}
-          negative={margin   !== null && margin   < 0}
+          label="Gross Margin"
+          value={grossMgn !== null ? fmtPct(grossMgn) : "—"}
+          positive={grossMgn !== null && grossMgn > 0.40}
+          badge={grossMgn !== null && grossMgn > 0.60 ? { text: "★ Exceptional", color: "#d4a017" } : undefined}
         />
         <DataRow
           label="Operating Margin"
@@ -1741,10 +1783,11 @@ function FundamentalPanel({
           negative={opMargin !== null && opMargin < 0}
         />
         <DataRow
-          label="Return on Equity"
-          value={roe !== null ? fmtPct(roe) : "—"}
-          positive={roe !== null && roe > 0.15}
-          negative={roe !== null && roe < 0}
+          label="Net Profit Margin"
+          value={margin !== null ? fmtPct(margin) : "—"}
+          positive={margin !== null && margin > 0.10}
+          negative={margin !== null && margin < 0}
+          badge={margin !== null && margin > 0.25 ? { text: "★ Exceptional", color: "#d4a017" } : undefined}
         />
         <DataRow
           label="EPS (TTM)"
@@ -1752,8 +1795,49 @@ function FundamentalPanel({
           positive={eps !== null && eps > 0}
           negative={eps !== null && eps < 0}
         />
-        <DataRow label="P/E Ratio"       value={pe       !== null ? pe.toFixed(1)       : "—"} />
-        <DataRow label="Dividend Yield"  value={divYield !== null ? fmtPct(divYield)    : "—"} />
+
+        {/* ── Balance Sheet ── */}
+        <DataGroupHeader title="Balance Sheet" />
+        <DataRow label="Market Cap"          value={fmtLargeNum(mcap)} />
+        <DataRow label="Shares Outstanding"  value={shares !== null ? fmtLargeNum(shares).replace("$", "") : "—"} />
+        <DataRow
+          label="Debt / Equity"
+          value={de !== null ? `${de.toFixed(2)}×` : "—"}
+          positive={de !== null && de < 0.5}
+          negative={de !== null && de > 2.0}
+          badge={de !== null && de < 0.3 ? { text: "✓ Conservative", color: "#7abf9a" } : undefined}
+        />
+
+        {/* ── Returns ── */}
+        <DataGroupHeader title="Returns" />
+        <DataRow
+          label="Return on Equity (ROE)"
+          value={roe !== null ? fmtPct(roe) : "—"}
+          positive={roe !== null && roe > 0.15}
+          negative={roe !== null && roe < 0}
+          badge={roe !== null && roe > 0.30 ? { text: "★ Exceptional", color: "#d4a017" } : undefined}
+        />
+        <DataRow
+          label="Return on Assets (ROA)"
+          value={roa !== null ? fmtPct(roa) : "—"}
+          positive={roa !== null && roa > 0.08}
+          negative={roa !== null && roa < 0}
+          badge={roa !== null && roa > 0.15 ? { text: "★ Exceptional", color: "#d4a017" } : undefined}
+        />
+        <DataRow label="Dividend Yield"      value={divYield !== null ? fmtPct(divYield) : "—"} />
+        <DataRow label="Dividend Per Share"  value={divPS !== null ? `$${divPS.toFixed(2)}` : "—"} />
+
+        {/* ── Valuation ── */}
+        <DataGroupHeader title="Valuation" />
+        <DataRow
+          label="P/E Ratio (TTM)"
+          value={pe !== null ? pe.toFixed(1) : "—"}
+          badge={pe !== null && pe > 40 ? { text: "⚠ Premium", color: "#c9962a" } : undefined}
+        />
+        <DataRow label="Forward P/E"         value={fpe !== null ? fpe.toFixed(1) : "—"} />
+        <DataRow label="PEG Ratio"           value={peg !== null ? peg.toFixed(2) : "—"} />
+        <DataRow label="Analyst Target"      value={target !== null ? `$${target.toFixed(2)}` : "—"} />
+
       </div>
     </DataPanel>
   );
@@ -1771,6 +1855,28 @@ function SentimentPanel({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const [ratings, setRatings] = useState<{
+    buy: number; hold: number; sell: number; total: number;
+  } | null>(null);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const fetchedRef = useRef(false);
+
+  // Lazy-load analyst ratings when panel is first opened
+  useEffect(() => {
+    if (!isOpen || fetchedRef.current) return;
+    fetchedRef.current = true;
+    setRatingsLoading(true);
+    fetch(`/api/stock-sentiment?symbol=${overview.Symbol}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.analystTotal) {
+          setRatings({ buy: data.analystBuy, hold: data.analystHold, sell: data.analystSell, total: data.analystTotal });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setRatingsLoading(false));
+  }, [isOpen, overview.Symbol]);
+
   const price  = parseSafe(quote?.["05. price"]);
   const target = parseSafe(overview.AnalystTargetPrice);
   const upside =
@@ -1783,20 +1889,58 @@ function SentimentPanel({
       ? `Analyst target $${target.toFixed(2)} · Implied upside ${upside !== null ? fmtPct(upside) : "—"}`
       : "Analyst targets, ratings, sentiment signals";
 
+  // Analyst ratings display
+  const ratingsValue = ratingsLoading
+    ? "Loading…"
+    : ratings !== null
+      ? `${ratings.buy} Buy · ${ratings.hold} Hold · ${ratings.sell} Sell`
+      : "—";
+
+  // Ratings consensus bar
+  const showBar = ratings !== null && ratings.total > 0;
+  const buyPct  = showBar ? (ratings!.buy  / ratings!.total) * 100 : 0;
+  const holdPct = showBar ? (ratings!.hold / ratings!.total) * 100 : 0;
+  const sellPct = showBar ? (ratings!.sell / ratings!.total) * 100 : 0;
+
   return (
     <DataPanel icon="S" title="Sentiment Data" isOpen={isOpen} onToggle={onToggle} previewLine={previewLine}>
       <div className="flex flex-col">
-        <DataRow label="Analyst Target Price"    value={target !== null ? `$${target.toFixed(2)}` : "—"} />
+        <DataRow
+          label="Analyst Target Price"
+          value={target !== null ? `$${target.toFixed(2)}` : "—"}
+        />
         <DataRow
           label="Implied Upside"
           value={upside !== null ? fmtPct(upside) : "—"}
           positive={upside !== null && upside >  0.05}
           negative={upside !== null && upside < -0.05}
+          badge={upside !== null && upside > 0.20 ? { text: "★ High upside", color: "#d4a017" } : undefined}
         />
-        <DataRow label="Analyst Ratings"         value="Insufficient data" />
-        <DataRow label="Short Interest"          value="Insufficient data" />
-        <DataRow label="Institutional Ownership" value="Insufficient data" />
-        <DataRow label="Social Sentiment"        value="Insufficient data" />
+        <DataRow
+          label="Analyst Ratings"
+          value={ratingsValue}
+          positive={ratings !== null && ratings.buy > ratings.hold + ratings.sell}
+        />
+
+        {/* Consensus bar */}
+        {showBar && (
+          <div className="py-2 border-b" style={{ borderColor: "#1a1a1a" }}>
+            <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
+              <div style={{ width: `${buyPct}%`,  background: "#7abf9a" }} />
+              <div style={{ width: `${holdPct}%`, background: "#888" }} />
+              <div style={{ width: `${sellPct}%`, background: "#c47878" }} />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[9px] tracking-wide" style={{ color: "#7abf9a" }}>Buy {Math.round(buyPct)}%</span>
+              <span className="text-[9px] tracking-wide" style={{ color: "#888" }}>Hold {Math.round(holdPct)}%</span>
+              <span className="text-[9px] tracking-wide" style={{ color: "#c47878" }}>Sell {Math.round(sellPct)}%</span>
+            </div>
+          </div>
+        )}
+
+        <DataRow label="Short Interest"          value="—" />
+        <DataRow label="Institutional Ownership" value="—" />
+        <DataRow label="Insider Ownership"       value="—" />
       </div>
     </DataPanel>
   );
@@ -1869,6 +2013,359 @@ function RiskPanel({
         <DataRow label="Credit Risk (Debt/Equity)" value="Insufficient data" />
       </div>
     </DataPanel>
+  );
+}
+
+// ── Entry Price Zones ──────────────────────────────────────────────────────────
+const SECTOR_PE: Record<string, number> = {
+  "Technology": 25,
+  "Healthcare": 20,
+  "Financial Services": 14,
+  "Consumer Cyclical": 18,
+  "Consumer Defensive": 20,
+  "Energy": 14,
+  "Utilities": 17,
+  "Real Estate": 20,
+  "Communication Services": 22,
+  "Industrials": 20,
+  "Basic Materials": 15,
+};
+
+function EntryPriceZones({
+  overview,
+  quote,
+}: {
+  overview: StockOverview;
+  quote: GlobalQuote | null;
+}) {
+  const price = parseSafe(quote?.["05. price"]);
+  const eps   = parseSafe(overview.EPS);
+  const sector = (overview.Sector && overview.Sector !== "None") ? overview.Sector : "";
+  const sectorPE = SECTOR_PE[sector] ?? 18;
+
+  if (price === null || price <= 0) return null;
+
+  const aggressiveEntry = price;
+  const fairValueEntry  = price * 0.87;
+  const dreamEntry      = price * 0.70;
+
+  const formulaFairValue = eps !== null && eps > 0 ? eps * sectorPE : null;
+
+  const zones = [
+    {
+      label:       "Aggressive Entry",
+      price:       aggressiveEntry,
+      discount:    null,
+      description: "For high conviction investors comfortable with premium valuation",
+      color:       "#d4a017",
+      bg:          "rgba(212,160,23,0.05)",
+      border:      "rgba(212,160,23,0.2)",
+    },
+    {
+      label:       "Fair Value Entry",
+      price:       fairValueEntry,
+      discount:    13,
+      description: "Represents a more reasonable valuation based on current earnings",
+      color:       "#60a5fa",
+      bg:          "rgba(96,165,250,0.05)",
+      border:      "rgba(96,165,250,0.2)",
+    },
+    {
+      label:       "Dream Entry",
+      price:       dreamEntry,
+      discount:    30,
+      description: "Historically a strong long-term entry point for this business",
+      color:       "#4ade80",
+      bg:          "rgba(74,222,128,0.05)",
+      border:      "rgba(74,222,128,0.2)",
+    },
+  ];
+
+  return (
+    <div
+      className="rounded-2xl p-5 md:p-6"
+      style={{
+        background: "#0b0b0b",
+        border: "1px solid rgba(212,175,55,0.12)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-5">
+        Entry Price Zones
+      </p>
+
+      <div className="flex flex-col gap-3 mb-5">
+        {zones.map((z, i) => (
+          <div
+            key={i}
+            className="rounded-xl p-4 flex items-start justify-between gap-4"
+            style={{ background: z.bg, border: `1px solid ${z.border}` }}
+          >
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-[10px] tracking-[0.18em] uppercase font-semibold mb-1"
+                style={{ color: z.color }}
+              >
+                {z.label}
+                {z.discount !== null && (
+                  <span
+                    className="ml-2 text-[9px] font-normal"
+                    style={{ color: "#555", letterSpacing: "0.1em" }}
+                  >
+                    −{z.discount}%
+                  </span>
+                )}
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: "#666" }}>
+                {z.description}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <span
+                style={{
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: z.color,
+                  lineHeight: 1,
+                }}
+              >
+                ${z.price.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Formula */}
+      <div
+        className="rounded-lg px-4 py-3"
+        style={{ background: "#0f0f0f", border: "1px solid #1e1e1e" }}
+      >
+        <p className="text-[9px] text-[#555] tracking-[0.22em] uppercase mb-2">
+          Valuation Formula
+        </p>
+        <p className="text-[11px] leading-relaxed" style={{ color: "#666" }}>
+          <span style={{ color: "#888" }}>EPS (TTM)</span>
+          {eps !== null && eps > 0
+            ? ` $${eps.toFixed(2)}`
+            : " —"}
+          <span style={{ color: "#444" }}> × </span>
+          <span style={{ color: "#888" }}>Sector P/E</span>
+          {` ${sectorPE}x`}
+          {sector && (
+            <span style={{ color: "#444" }}> ({sector})</span>
+          )}
+          <span style={{ color: "#444" }}> = </span>
+          <span style={{ color: "#d4a017" }}>
+            {formulaFairValue !== null
+              ? `$${formulaFairValue.toFixed(2)} fair value estimate`
+              : "N/A — negative or missing EPS"}
+          </span>
+        </p>
+        {formulaFairValue !== null && (
+          <p className="text-[10px] mt-1.5" style={{ color: "#3a3a3a" }}>
+            Current price of ${price.toFixed(2)} is{" "}
+            {price > formulaFairValue
+              ? `${((price / formulaFairValue - 1) * 100).toFixed(0)}% above this estimate`
+              : `${((1 - price / formulaFairValue) * 100).toFixed(0)}% below this estimate`}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Red Flags ──────────────────────────────────────────────────────────────────
+interface RedFlag {
+  label: string;
+  triggered: boolean | null; // null = insufficient data
+  detail: string;
+}
+
+function RedFlags({
+  overview,
+  quote,
+}: {
+  overview: StockOverview;
+  quote: GlobalQuote | null;
+}) {
+  const pe          = parseSafe(overview.PERatio);
+  const forwardPE   = parseSafe(overview.ForwardPE);
+  const peg         = parseSafe(overview.PEGRatio);
+  const eps         = parseSafe(overview.EPS);
+  const opMargin    = parseSafe(overview.OperatingMarginTTM);
+  const profitMargin = parseSafe(overview.ProfitMargin);
+
+  // Flag 4: P/E > 50 with slowing growth (PEG > 2 or forward PE expanding), or extreme multiple > 100x
+  const flag4Triggered = (() => {
+    if (pe === null) return null;
+    if (pe <= 50) return false;
+    // Extreme multiple (>100x) is always flagged regardless of growth
+    if (pe > 100) return true;
+    // Slowing growth at elevated valuation: PEG > 2 or expanding forward multiple
+    const slowingPEG = peg !== null && peg > 2;
+    const expandingMultiple = forwardPE !== null && forwardPE > pe * 1.05;
+    return slowingPEG || expandingMultiple;
+  })();
+
+  // Flag 5: Operating CF negative while net income positive
+  // Proxy: operating margin < 0 while EPS > 0 (earnings positive but operations losing money)
+  const flag5Triggered = (() => {
+    if (opMargin === null || eps === null) return null;
+    return opMargin < 0 && eps > 0;
+  })();
+
+  // Bonus check: company is unprofitable (EPS negative)
+  const epsNegative = eps !== null ? eps < 0 : null;
+
+  // Bonus check: profit margin severely compressed
+  const marginNegative = profitMargin !== null ? profitMargin < 0 : null;
+
+  const flags: RedFlag[] = [
+    {
+      label:     "Revenue declining for 2+ quarters",
+      triggered: null,
+      detail:    "Requires quarterly earnings history — not available in current data",
+    },
+    {
+      label:     "Debt/Equity above 150%",
+      triggered: null,
+      detail:    "Requires balance sheet data — not available in current data",
+    },
+    {
+      label:     "Short interest above 15%",
+      triggered: null,
+      detail:    "Requires market microstructure data — not available in current data",
+    },
+    {
+      label:     "P/E above 50 with slowing growth",
+      triggered: flag4Triggered,
+      detail:    flag4Triggered === true
+        ? pe !== null && pe > 100
+          ? `P/E of ${pe.toFixed(1)}x is an extreme multiple that requires flawless execution to justify`
+          : `P/E of ${pe?.toFixed(1)}x combined with ${peg !== null ? `PEG ratio of ${peg.toFixed(2)}` : "expanding forward multiples"} signals expensive-and-decelerating`
+        : pe !== null
+          ? `P/E of ${pe.toFixed(1)}x — ${pe <= 50 ? "within acceptable range" : "elevated but growth appears to support it"}`
+          : "P/E data unavailable",
+    },
+    {
+      label:     "Operating cash flow negative while net income positive",
+      triggered: flag5Triggered,
+      detail:    flag5Triggered === true
+        ? `Operating margin is ${((opMargin ?? 0) * 100).toFixed(1)}% while EPS is positive — earnings quality concern`
+        : opMargin !== null && eps !== null
+          ? `Operating margin of ${(opMargin * 100).toFixed(1)}% is ${opMargin >= 0 ? "positive — no concern" : "negative but EPS also negative — losses are consistent"}`
+          : "Operating margin or EPS data unavailable",
+    },
+  ];
+
+  // Extra computed flags
+  if (epsNegative === true) {
+    flags.push({
+      label:     "Company currently unprofitable (negative EPS)",
+      triggered: true,
+      detail:    `EPS of $${eps?.toFixed(2)} — company is losing money on a per-share basis`,
+    });
+  }
+
+  if (marginNegative === true && epsNegative !== true) {
+    flags.push({
+      label:     "Negative profit margin",
+      triggered: true,
+      detail:    `Profit margin of ${((profitMargin ?? 0) * 100).toFixed(1)}% indicates the business is not retaining revenue as earnings`,
+    });
+  }
+
+  const triggeredFlags = flags.filter((f) => f.triggered === true);
+  const noRealFlags    = triggeredFlags.length === 0;
+
+  return (
+    <div
+      className="rounded-2xl p-5 md:p-6"
+      style={{
+        background: "#0b0b0b",
+        border: "1px solid rgba(212,175,55,0.12)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      <p className="text-[9px] text-[#aaa] tracking-[0.4em] uppercase mb-5">
+        Red Flags
+      </p>
+
+      {noRealFlags ? (
+        <div
+          className="flex items-center gap-3 rounded-xl px-4 py-3.5"
+          style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.15)" }}
+        >
+          <span style={{ color: "#4ade80", fontSize: "0.95rem" }}>✓</span>
+          <span className="text-[12px] leading-relaxed" style={{ color: "#7abf9a" }}>
+            No significant red flags detected in current data
+          </span>
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-3 rounded-xl px-4 py-3 mb-4"
+          style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)" }}
+        >
+          <span style={{ color: "#f87171", fontSize: "0.95rem" }}>⚠</span>
+          <span className="text-[11px] leading-relaxed" style={{ color: "#c47878" }}>
+            {triggeredFlags.length} red flag{triggeredFlags.length > 1 ? "s" : ""} detected — review carefully before investing
+          </span>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 mt-3">
+        {flags.map((flag, i) => {
+          const isTriggered = flag.triggered === true;
+          const isInsufficient = flag.triggered === null;
+
+          return (
+            <div
+              key={i}
+              className="rounded-xl px-4 py-3 flex items-start gap-3"
+              style={{
+                background: isTriggered
+                  ? "rgba(248,113,113,0.06)"
+                  : isInsufficient
+                    ? "transparent"
+                    : "rgba(74,222,128,0.03)",
+                border: isTriggered
+                  ? "1px solid rgba(248,113,113,0.2)"
+                  : isInsufficient
+                    ? "1px solid #161616"
+                    : "1px solid rgba(74,222,128,0.12)",
+                opacity: isInsufficient ? 0.55 : 1,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "0.85rem",
+                  flexShrink: 0,
+                  marginTop: 1,
+                  color: isTriggered ? "#f87171" : isInsufficient ? "#333" : "#4ade80",
+                }}
+              >
+                {isTriggered ? "🚩" : isInsufficient ? "·" : "✓"}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p
+                  className="text-[11px] font-medium leading-snug mb-0.5"
+                  style={{
+                    color: isTriggered ? "#d47878" : isInsufficient ? "#3a3a3a" : "#7abf9a",
+                  }}
+                >
+                  {flag.label}
+                </p>
+                <p className="text-[10px] leading-relaxed" style={{ color: "#444" }}>
+                  {flag.detail}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1976,6 +2473,24 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
 
   const vConf = verdict ? VERDICT_CONFIG[verdict] : null;
   const isStreaming = phase === "streaming";
+
+  // ── Persist verdict to cache after a real (non-fallback) AI analysis ─────────
+  // Saves { verdict, updatedAt } under athena_verdict_cache in localStorage so
+  // the PopularAnalyses component on the homepage can show the real AI verdict.
+  // Only runs when: analysis is done, verdict is present, and it's a live AI
+  // result (not the deterministic fallback).
+  useEffect(() => {
+    if (phase !== "done" || !verdict || isFallback) return;
+    try {
+      const existing = JSON.parse(
+        localStorage.getItem("athena_verdict_cache") ?? "{}",
+      ) as Record<string, { verdict: string; updatedAt: number }>;
+      existing[overview.Symbol] = { verdict, updatedAt: Date.now() };
+      localStorage.setItem("athena_verdict_cache", JSON.stringify(existing));
+    } catch {
+      // localStorage unavailable (SSR guard, private browsing) — silent no-op
+    }
+  }, [phase, verdict, isFallback, overview.Symbol]);
 
   const section13 = sections.find((s) => s.number === 13);
   const section13Content = section13 ? cleanContent(section13.content, 13) : "";
@@ -2282,7 +2797,21 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
           )}
 
           {/* ══════════════════════════════════════════════
-              1.5 ATHENA UPDATE
+              1.5 ENTRY PRICE ZONES
+          ══════════════════════════════════════════════ */}
+          {phase === "done" && (
+            <EntryPriceZones overview={overview} quote={quote} />
+          )}
+
+          {/* ══════════════════════════════════════════════
+              1.6 RED FLAGS
+          ══════════════════════════════════════════════ */}
+          {phase === "done" && (
+            <RedFlags overview={overview} quote={quote} />
+          )}
+
+          {/* ══════════════════════════════════════════════
+              1.7 ATHENA UPDATE
           ══════════════════════════════════════════════ */}
           {phase === "done" && verdict && sections.length > 0 && (
             <AthenaUpdate sections={sections} verdict={verdict} />

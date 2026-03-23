@@ -1,5 +1,5 @@
 "use client";
-
+// v2 — 122 tickers, pagination, globe icons
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { ScreenerMetrics } from "@/app/api/screener-data/route";
@@ -8,7 +8,7 @@ import type { ScreenerMetrics } from "@/app/api/screener-data/route";
 type MarketCapFilter = "All" | "Large" | "Mid" | "Small";
 type RegionFilter    = "All" | "US"    | "Global";
 type SortDir         = "asc" | "desc";
-type SortableKey     = "pe" | "roe" | "profitMargin" | "revenueGrowth" | "dividendYield" | "epsGrowth";
+type SortableKey     = "pe" | "roe" | "profitMargin" | "revenueGrowth" | "dividendYield" | "epsGrowth" | "drawdownPct" | "price";
 
 // Static identity — what we know without an API call
 interface StockIdentity {
@@ -30,6 +30,8 @@ interface Stock extends StockIdentity {
   epsGrowth:     number | null;
   marketCap:     "Large" | "Mid" | "Small" | null;
   insight:       string;
+  price:         number | null;
+  drawdownPct:   number | null;  // % below 52-week high (negative value)
 }
 
 interface Col {
@@ -101,6 +103,22 @@ const STOCKS_BASE: StockIdentity[] = [
   { ticker: "PANW",  company: "Palo Alto Networks",      sector: "Technology",    region: "US"     },
   { ticker: "VEEV",  company: "Veeva Systems",           sector: "Technology",    region: "US"     },
   { ticker: "QLYS",  company: "Qualys",                  sector: "Technology",    region: "US"     },
+  { ticker: "TTD",   company: "The Trade Desk",          sector: "Technology",    region: "US"     },
+  { ticker: "CRWD",  company: "CrowdStrike",             sector: "Technology",    region: "US"     },
+  { ticker: "DDOG",  company: "Datadog",                 sector: "Technology",    region: "US"     },
+  { ticker: "DUOL",  company: "Duolingo",                sector: "Technology",    region: "US"     },
+  { ticker: "TYL",   company: "Tyler Technologies",      sector: "Technology",    region: "US"     },
+  { ticker: "AXON",  company: "Axon Enterprise",         sector: "Technology",    region: "US"     },
+  { ticker: "FICO",  company: "Fair Isaac Corporation",  sector: "Technology",    region: "US"     },
+  { ticker: "CDNS",  company: "Cadence Design Systems",  sector: "Technology",    region: "US"     },
+  { ticker: "SNPS",  company: "Synopsys",                sector: "Technology",    region: "US"     },
+  { ticker: "CSGP",  company: "CoStar Group",            sector: "Technology",    region: "US"     },
+  { ticker: "ADSK",  company: "Autodesk",                sector: "Technology",    region: "US"     },
+  { ticker: "MPWR",  company: "Monolithic Power Systems",sector: "Technology",    region: "US"     },
+  { ticker: "ENTG",  company: "Entegris",                sector: "Technology",    region: "US"     },
+  { ticker: "MANH",  company: "Manhattan Associates",    sector: "Technology",    region: "US"     },
+  { ticker: "FI",    company: "Fiserv",                  sector: "Technology",    region: "US"     },
+  { ticker: "BR",    company: "Broadridge Financial",    sector: "Technology",    region: "US"     },
   // ── US Semiconductors ─────────────────────────────────────────────────────────
   { ticker: "AMAT",  company: "Applied Materials",       sector: "Technology",    region: "US"     },
   { ticker: "LRCX",  company: "Lam Research",            sector: "Technology",    region: "US"     },
@@ -119,6 +137,12 @@ const STOCKS_BASE: StockIdentity[] = [
   { ticker: "GS",    company: "Goldman Sachs",           sector: "Financials",    region: "US"     },
   { ticker: "SCHW",  company: "Charles Schwab",          sector: "Financials",    region: "US"     },
   { ticker: "BRK-B", company: "Berkshire Hathaway B",    sector: "Financials",    region: "US"     },
+  { ticker: "MKTX",  company: "MarketAxess Holdings",    sector: "Financials",    region: "US"     },
+  { ticker: "NDAQ",  company: "Nasdaq Inc",              sector: "Financials",    region: "US"     },
+  { ticker: "CME",   company: "CME Group",               sector: "Financials",    region: "US"     },
+  { ticker: "ICE",   company: "Intercontinental Exchange",sector:"Financials",   region: "US"     },
+  { ticker: "CBOE",  company: "Cboe Global Markets",     sector: "Financials",    region: "US"     },
+  { ticker: "AJG",   company: "Arthur J. Gallagher",     sector: "Financials",    region: "US"     },
   // ── US Healthcare ─────────────────────────────────────────────────────────────
   { ticker: "LLY",   company: "Eli Lilly",               sector: "Healthcare",    region: "US"     },
   { ticker: "UNH",   company: "UnitedHealth Group",      sector: "Healthcare",    region: "US"     },
@@ -128,10 +152,18 @@ const STOCKS_BASE: StockIdentity[] = [
   { ticker: "ISRG",  company: "Intuitive Surgical",      sector: "Healthcare",    region: "US"     },
   { ticker: "ABBV",  company: "AbbVie",                  sector: "Healthcare",    region: "US"     },
   { ticker: "VRTX",  company: "Vertex Pharmaceuticals",  sector: "Healthcare",    region: "US"     },
+  { ticker: "IDXX",  company: "IDEXX Laboratories",      sector: "Healthcare",    region: "US"     },
+  { ticker: "HIMS",  company: "Hims & Hers Health",      sector: "Healthcare",    region: "US"     },
+  { ticker: "DHR",   company: "Danaher",                 sector: "Healthcare",    region: "US"     },
+  { ticker: "MTD",   company: "Mettler-Toledo",          sector: "Healthcare",    region: "US"     },
+  { ticker: "WST",   company: "West Pharmaceutical Services",sector:"Healthcare", region: "US"     },
+  { ticker: "DOCS",  company: "Doximity",                sector: "Healthcare",    region: "US"     },
   // ── US Consumer ───────────────────────────────────────────────────────────────
   { ticker: "AMZN",  company: "Amazon",                  sector: "Consumer Disc", region: "US"     },
   { ticker: "NFLX",  company: "Netflix",                 sector: "Consumer Disc", region: "US"     },
   { ticker: "NKE",   company: "Nike",                    sector: "Consumer Disc", region: "US"     },
+  { ticker: "HD",    company: "Home Depot",              sector: "Consumer Disc", region: "US"     },
+  { ticker: "LOW",   company: "Lowe's Companies",        sector: "Consumer Disc", region: "US"     },
   { ticker: "COST",  company: "Costco",                  sector: "Staples",       region: "US"     },
   { ticker: "WMT",   company: "Walmart",                 sector: "Staples",       region: "US"     },
   { ticker: "PG",    company: "Procter & Gamble",        sector: "Staples",       region: "US"     },
@@ -148,6 +180,11 @@ const STOCKS_BASE: StockIdentity[] = [
   { ticker: "ECL",   company: "Ecolab",                  sector: "Industrials",   region: "US"     },
   { ticker: "SHW",   company: "Sherwin-Williams",        sector: "Industrials",   region: "US"     },
   { ticker: "CPRT",  company: "Copart",                  sector: "Industrials",   region: "US"     },
+  { ticker: "ITW",   company: "Illinois Tool Works",     sector: "Industrials",   region: "US"     },
+  { ticker: "WM",    company: "Waste Management",        sector: "Industrials",   region: "US"     },
+  { ticker: "ROL",   company: "Rollins",                 sector: "Industrials",   region: "US"     },
+  { ticker: "WSO",   company: "Watsco",                  sector: "Industrials",   region: "US"     },
+  { ticker: "ADP",   company: "Automatic Data Processing",sector:"Technology",   region: "US"     },
   // ── US Energy ─────────────────────────────────────────────────────────────────
   { ticker: "XOM",   company: "ExxonMobil",              sector: "Energy",        region: "US"     },
   { ticker: "CVX",   company: "Chevron",                 sector: "Energy",        region: "US"     },
@@ -179,6 +216,12 @@ const STOCKS_BASE: StockIdentity[] = [
   { ticker: "KYCCF", company: "Keyence Corporation",     sector: "Technology",    region: "Global" },
   { ticker: "MELI",  company: "MercadoLibre",            sector: "Consumer Disc", region: "Global" },
   { ticker: "BABA",  company: "Alibaba Group",           sector: "Consumer Disc", region: "Global" },
+  { ticker: "INFY",  company: "Infosys",                 sector: "Technology",    region: "Global" },
+  // ── Americas / Emerging ───────────────────────────────────────────────────────
+  { ticker: "SHOP",  company: "Shopify",                 sector: "Technology",    region: "Global" },
+  { ticker: "NU",    company: "Nu Holdings",             sector: "Financials",    region: "Global" },
+  { ticker: "SE",    company: "Sea Limited",             sector: "Technology",    region: "Global" },
+  { ticker: "ADYEY", company: "Adyen NV",                sector: "Financials",    region: "Global" },
 ];
 
 const ALL_TICKERS = STOCKS_BASE.map((s) => s.ticker);
@@ -198,6 +241,7 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const PRESETS: { id: string; label: string; desc: string; filters: Partial<FilterState> }[] = [
+  { id: "lifetime-opportunity", label: "⚡ Lifetime Opportunity", desc: "Quality stocks ≥25% below their 52-week high — historically strong entry points", filters: {} },
   { id: "high-roe",            label: "High ROE",             desc: "Exceptional returns on equity",               filters: { minROE: 30 } },
   { id: "undervalued-quality", label: "Undervalued Quality",  desc: "Strong fundamentals below fair value",        filters: { maxPE: 25, minROE: 15, minMargin: 10 } },
   { id: "strong-fcf",          label: "Strong FCF",           desc: "Significant free cash flow generation",       filters: { minMargin: 20 } },
@@ -213,6 +257,8 @@ const COLS: Col[] = [
   { key: "ticker",        label: "Ticker",         sortable: false, align: "left"  },
   { key: "company",       label: "Company",        sortable: false, align: "left"  },
   { key: "sector",        label: "Sector",         sortable: false, align: "left"  },
+  { key: "price",         label: "Price",          sortable: true,  align: "right" },
+  { key: "drawdownPct",   label: "From High",      sortable: true,  align: "right" },
   { key: "pe",            label: "P/E",            sortable: true,  align: "right" },
   { key: "roe",           label: "ROE",            sortable: true,  align: "right" },
   { key: "profitMargin",  label: "Margin",         sortable: true,  align: "right" },
@@ -221,6 +267,16 @@ const COLS: Col[] = [
   { key: "epsGrowth",     label: "EPS Growth",     sortable: true,  align: "right" },
   { key: "insight",       label: "Athena's Take",  sortable: false, align: "left"  },
 ];
+
+// ── Lifetime Opportunity qualifier ─────────────────────────────────────────────
+function isLifetimeOpportunity(s: Stock): boolean {
+  return (
+    s.drawdownPct   !== null && s.drawdownPct   <= -25 &&
+    s.revenueGrowth !== null && s.revenueGrowth >   0  &&
+    s.profitMargin  !== null && s.profitMargin  >   8  &&
+    s.roe           !== null && s.roe           >  15
+  );
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function signColor(g: number | null): string {
@@ -242,6 +298,7 @@ export default function ScreenerClient() {
   });
   const [sortKey, setSortKey] = useState<SortableKey>("roe");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page,    setPage]    = useState(0);
 
   // ── Live data state ──────────────────────────────────────────────────────────
   const [liveData,  setLiveData]  = useState<Record<string, ScreenerMetrics>>({});
@@ -275,6 +332,10 @@ export default function ScreenerClient() {
           epsGrowth:     live?.epsGrowth     ?? null,
           marketCap:     live?.marketCapCat  ?? null,
           insight:       live ? generateInsight(live) : "",
+          price:         live?.price         ?? null,
+          drawdownPct:   (live?.price != null && live?.high52w != null && live.high52w > 0)
+                           ? Math.round(((live.price - live.high52w) / live.high52w) * 1000) / 10
+                           : null,
         };
       }),
     [liveData],
@@ -312,8 +373,11 @@ export default function ScreenerClient() {
   }
 
   const results = useMemo(() => {
+    const isLO = activePreset === "lifetime-opportunity";
     return stocks
       .filter((s) => {
+        // Lifetime Opportunity preset: custom filter
+        if (isLO) return isLifetimeOpportunity(s);
         // Numeric filters: null metric value → exclude when filter is active (honest: can't verify)
         if (filters.maxPE < 100 && (s.pe === null || s.pe > filters.maxPE))                                 return false;
         if (filters.minMargin > 0 && (s.profitMargin === null || s.profitMargin < filters.minMargin))       return false;
@@ -330,6 +394,15 @@ export default function ScreenerClient() {
         return true;
       })
       .sort((a, b) => {
+        // Lifetime Opportunity: sort by most beaten-down first (most negative drawdown)
+        if (isLO) {
+          const av = a.drawdownPct;
+          const bv = b.drawdownPct;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          return av - bv; // ascending → most negative first
+        }
         const av = a[sortKey] as number | null;
         const bv = b[sortKey] as number | null;
         // Null values always sink to the bottom
@@ -338,8 +411,18 @@ export default function ScreenerClient() {
         if (bv === null) return -1;
         return sortDir === "desc" ? bv - av : av - bv;
       })
-      .slice(0, 25);
-  }, [stocks, filters, sortKey, sortDir]);
+      .slice(0, 100);
+  }, [stocks, filters, sortKey, sortDir, activePreset]);
+
+  // Reset to page 0 whenever filters, sort, or preset change
+  useEffect(() => { setPage(0); }, [filters, activePreset, sortKey, sortDir]);
+
+  const PAGE_SIZE = 50;
+  const totalResults = results.length;
+  const pageStart    = page * PAGE_SIZE;
+  const pageEnd      = Math.min(pageStart + PAGE_SIZE, totalResults);
+  const displayedResults = results.slice(pageStart, pageEnd);
+  const totalPages   = Math.ceil(totalResults / PAGE_SIZE);
 
   const hasActiveFilters =
     filters.maxPE < 100 || filters.minMargin > 0 || filters.minROE > 0 ||
@@ -393,11 +476,28 @@ export default function ScreenerClient() {
       <div className="flex flex-wrap items-center gap-2">
         {PRESETS.map((preset) => {
           const isActive = activePreset === preset.id;
+          const isLOPreset = preset.id === "lifetime-opportunity";
           return (
             <button
               key={preset.id}
               onClick={() => applyPreset(preset.id)}
-              style={{
+              style={isLOPreset ? {
+                padding:       "11px 18px",
+                minHeight:     44,
+                borderRadius:  8,
+                border:        `1px solid ${isActive ? "#f0c040" : "rgba(212,160,23,0.5)"}`,
+                background:    isActive ? "rgba(212,160,23,0.18)" : "rgba(212,160,23,0.06)",
+                color:         isActive ? "#f0c040" : "#d4a017",
+                fontSize:      10,
+                letterSpacing: "0.14em",
+                fontFamily:    "'Cinzel', serif",
+                fontWeight:    700,
+                textTransform: "uppercase",
+                cursor:        "pointer",
+                transition:    "all 0.15s ease",
+                whiteSpace:    "nowrap",
+                boxShadow:     isActive ? "0 0 16px rgba(212,160,23,0.22)" : "none",
+              } : {
                 padding:       "11px 18px",
                 minHeight:     44,
                 borderRadius:  8,
@@ -565,8 +665,10 @@ export default function ScreenerClient() {
             <span style={{ color: "#333" }}>Loading live market data…</span>
           ) : (
             <>
-              {results.length} result{results.length !== 1 ? "s" : ""}
-              {results.length === 25 ? " · max" : ""}
+              {totalResults > PAGE_SIZE
+                ? `Showing ${pageStart + 1}–${pageEnd} of ${totalResults} matching stocks`
+                : `${totalResults} matching stock${totalResults !== 1 ? "s" : ""}`}
+              {totalResults === 100 && <span style={{ color: "#555" }}> · max 100</span>}
               <span style={{ color: "#333", marginLeft: 10 }}>Click any row to analyze</span>
             </>
           )}
@@ -582,6 +684,28 @@ export default function ScreenerClient() {
           </button>
         )}
       </div>
+
+      {/* ── Lifetime Opportunity Banner ────────────────────────────────────── */}
+      {activePreset === "lifetime-opportunity" && (
+        <div
+          style={{
+            borderRadius: 10,
+            border:       "1px solid rgba(212,160,23,0.25)",
+            background:   "rgba(212,160,23,0.05)",
+            padding:      "14px 18px",
+            display:      "flex",
+            flexDirection: "column",
+            gap:          6,
+          }}
+        >
+          <p style={{ fontSize: 11, color: "#d4a017", fontWeight: 600, letterSpacing: "0.06em" }}>
+            ⚡ These stocks are ≥25% below their 52-week high while maintaining positive revenue growth, profit margins above 8%, and ROE above 15%. Sorted by largest drawdown first.
+          </p>
+          <p style={{ fontSize: 9.5, color: "#555", letterSpacing: "0.04em" }}>
+            Disclaimer: A lower price does not guarantee future returns. Past drawdowns may deepen further. This is a research tool for educational purposes — not financial advice. Always do your own due diligence before investing.
+          </p>
+        </div>
+      )}
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div style={{ overflowX: "auto", borderRadius: 16, border: "1px solid #161616" }}>
@@ -643,7 +767,7 @@ export default function ScreenerClient() {
                 </td>
               </tr>
             ) : (
-              results.map((stock, i) => {
+              displayedResults.map((stock, i) => {
                 const evenBg = "#0a0a0a";
                 const oddBg  = "#080808";
                 return (
@@ -664,6 +788,22 @@ export default function ScreenerClient() {
                       <span style={{ fontFamily: "'Cinzel', serif", fontSize: 12, fontWeight: 700, color: "#c49a28", letterSpacing: "0.08em" }}>
                         {stock.ticker}
                       </span>
+                      {stock.region === "Global" && (
+                        <span
+                          title="International stock"
+                          style={{ marginLeft: 4, fontSize: 10, verticalAlign: "middle", opacity: 0.65 }}
+                        >
+                          🌍
+                        </span>
+                      )}
+                      {isLifetimeOpportunity(stock) && (
+                        <span
+                          title="Lifetime Opportunity — quality stock ≥25% below 52-week high"
+                          style={{ marginLeft: 4, fontSize: 10, verticalAlign: "middle", opacity: 0.9 }}
+                        >
+                          ⚡
+                        </span>
+                      )}
                     </td>
 
                     {/* Company */}
@@ -678,6 +818,30 @@ export default function ScreenerClient() {
                       <span style={{ fontSize: 9.5, color: "#4a4a4a", letterSpacing: "0.07em" }}>
                         {stock.sector}
                       </span>
+                    </td>
+
+                    {/* Price */}
+                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      <span style={{ fontSize: 12, color: "#888", fontVariantNumeric: "tabular-nums" }}>
+                        {stock.price !== null ? `$${stock.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                      </span>
+                    </td>
+
+                    {/* From High (drawdown) */}
+                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      {stock.drawdownPct === null ? (
+                        <span style={{ fontSize: 12, color: "#333", fontVariantNumeric: "tabular-nums" }}>—</span>
+                      ) : stock.drawdownPct >= -5 ? (
+                        <span style={{ fontSize: 12, color: "#7abf9a", fontVariantNumeric: "tabular-nums" }}>Near High</span>
+                      ) : (
+                        <span style={{
+                          fontSize: 12,
+                          fontVariantNumeric: "tabular-nums",
+                          color: stock.drawdownPct <= -25 ? "#c47878" : "#777",
+                        }}>
+                          {stock.drawdownPct.toFixed(1)}%
+                        </span>
+                      )}
                     </td>
 
                     {/* P/E */}
@@ -747,6 +911,49 @@ export default function ScreenerClient() {
           </tbody>
         </table>
       </div>
+
+      {/* ── Pagination ─────────────────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between" style={{ paddingTop: 4 }}>
+          <button
+            onClick={() => setPage((p) => p - 1)}
+            disabled={page === 0}
+            style={{
+              padding:       "9px 18px",
+              borderRadius:  8,
+              border:        `1px solid ${page === 0 ? "#1a1a1a" : "rgba(212,160,23,0.3)"}`,
+              background:    "transparent",
+              color:         page === 0 ? "#333" : "#d4a017",
+              fontSize:      10,
+              letterSpacing: "0.12em",
+              cursor:        page === 0 ? "default" : "pointer",
+              transition:    "all 0.15s ease",
+            }}
+          >
+            ← Previous
+          </button>
+          <p style={{ fontSize: 9.5, color: "#444", letterSpacing: "0.1em" }}>
+            Page {page + 1} of {totalPages} &nbsp;·&nbsp; {totalResults} total
+          </p>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page + 1 >= totalPages}
+            style={{
+              padding:       "9px 18px",
+              borderRadius:  8,
+              border:        `1px solid ${page + 1 >= totalPages ? "#1a1a1a" : "rgba(212,160,23,0.3)"}`,
+              background:    "transparent",
+              color:         page + 1 >= totalPages ? "#333" : "#d4a017",
+              fontSize:      10,
+              letterSpacing: "0.12em",
+              cursor:        page + 1 >= totalPages ? "default" : "pointer",
+              transition:    "all 0.15s ease",
+            }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* Footer note */}
       <p style={{ fontSize: 9, color: "#222", letterSpacing: "0.15em", textTransform: "uppercase", textAlign: "center", paddingBottom: 4 }}>

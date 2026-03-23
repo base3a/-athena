@@ -34,6 +34,7 @@ export interface StockOverview {
   DividendPerShare: string;
   AnalystTargetPrice: string;
   SharesOutstanding: string;
+  DebtToEquity: string;
   // API status fields
   Note?: string;
   Information?: string;

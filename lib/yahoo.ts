@@ -378,5 +378,7 @@ export function buildYahooOverview(
     DividendPerShare:     str(fundamentals.dividendPerShare),
     AnalystTargetPrice:   str(fundamentals.analystTarget),
     SharesOutstanding:    abs(fundamentals.sharesOutstanding),
+    // D/E: Yahoo raw API returns ×100 (167 = 1.67×) — divide to get actual ratio
+    DebtToEquity:         fundamentals.debtToEquity != null ? str(fundamentals.debtToEquity / 100) : "None",
   };
 }

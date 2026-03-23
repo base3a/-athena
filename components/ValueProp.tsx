@@ -6,7 +6,7 @@ export default function ValueProp() {
         className="text-white font-semibold mb-3 leading-snug"
         style={{ fontFamily: "'Cinzel', serif", fontSize: "1.05rem", letterSpacing: "0.03em" }}
       >
-        Any stock. Full clarity. Seconds.
+        Any stock. Clear verdict. Seconds.
       </p>
 
       {/* Description */}
@@ -30,7 +30,7 @@ export default function ValueProp() {
           </p>
           {[
             "Scattered data sources",
-            "Charts & filings",
+            "Manual chart & filing review",
             "Financial reports",
             "Hours of research",
           ].map((item) => (

@@ -255,7 +255,7 @@ export default function TickerInput({ compact = false }: { compact?: boolean }) 
       {!compact && (
         <div className="flex flex-col items-center gap-1 mt-3">
           <p className="text-center text-[12px] font-medium" style={{ color: "#9A9A9A" }}>
-            Get a full AI stock analysis in seconds.
+            Complete AI analysis. In seconds.
           </p>
           <p className="text-center text-[11px] tracking-widest uppercase" style={{ color: "#555" }}>
             NYSE &bull; NASDAQ &bull; LSE &bull; TSE &bull; Global Exchanges

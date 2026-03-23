@@ -103,7 +103,12 @@ ATHENA SCORE (formula-computed — deterministic, not AI judgment):
 ${formulaScore}
 CRITICAL RULES — these override everything else:
 1. VERDICT must be EXACTLY: ${formulaResult.verdict}  (do not deviate)
-2. CONFIDENCE must be EXACTLY: ${Math.round(formulaResult.score)}  (do not deviate)
+2. CONFIDENCE must be an integer from 3 to 10 reflecting how CERTAIN you are of the verdict — NOT how good the stock is:
+   • 8–10: Very clear signal with strong data support — limited room for debate
+   • 5–7: Mixed signals but verdict is clear enough to stand
+   • 3–4: Speculative, uncertain, or conflicting data — verdict is a best guess
+   Never go below 3. Even the most uncertain verdict carries at least 3/10 confidence.
+   Example: a stock with an AVOID verdict due to extreme valuation but meaningful bull-case optionality should score 6–7, not 2.
 These values come from Athena's shared scoring formula so they are consistent across all pages of the platform.
 
 Answer the following 13 investment framework questions. Keep each answer to 2-4 sentences. Reference specific numbers wherever relevant.
@@ -124,7 +129,7 @@ TIMEFRAME: [One plain sentence. Is this better for long-term buy-and-hold invest
 [1-2 additional sentences of supporting reasoning. Be specific and data-driven.]
 
 ### 11. Confidence Score
-CONFIDENCE: [write a single integer from 1 to 10]
+CONFIDENCE: [write a single integer from 3 to 10, reflecting certainty of verdict — not stock quality]
 [One sentence explaining what drives this confidence level — what makes this analysis more or less certain?]
 
 ### 1. Business Quality

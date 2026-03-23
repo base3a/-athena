@@ -7,14 +7,10 @@ const nextConfig: NextConfig = {
   // Strict mode catches potential issues during development
   reactStrictMode: true,
 
-  // Disable webpack's persistent cache in dev — prevents ENOENT errors on
-  // cold start after `rm -rf .next` (pack files written before dirs exist)
-  webpack(config, { dev }) {
-    if (dev) {
-      config.cache = false;
-    }
-    return config;
-  },
+  // Turbopack config (default in Next.js 16).
+  // Empty object silences the "webpack config present but no turbopack config"
+  // error while keeping all other settings intact.
+  turbopack: {},
 
   experimental: {
     // Use the standard .next/ output path instead of .next/dev/
@@ -40,13 +36,17 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
-      {
-        // Cache static assets aggressively — Next.js content-hashes them
-        source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
+      // In production, Next.js content-hashes all static filenames so immutable
+      // caching is safe. In dev, filenames repeat across HMR rebuilds so we
+      // must not cache them — otherwise the browser serves stale bundles.
+      ...(process.env.NODE_ENV === "production"
+        ? [{
+            source: "/_next/static/(.*)",
+            headers: [
+              { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+            ],
+          }]
+        : []),
     ];
   },
 };

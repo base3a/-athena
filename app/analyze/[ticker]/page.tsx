@@ -92,6 +92,13 @@ export default async function AnalyzePage({
   const lastDay = quote?.["07. latest trading day"] ?? null;
   const isPositive = change ? parseFloat(change) >= 0 : null;
 
+  // Debt/Equity display helper — shows "1.67×" or "N/A"
+  const deToDisplay = (val: string | undefined): string => {
+    if (!val || val === "None" || val === "-") return "N/A";
+    const n = parseFloat(val);
+    return isNaN(n) ? "N/A" : `${n.toFixed(2)}×`;
+  };
+
   // 52-week range position
   const high52 = parseFloat(overview["52WeekHigh"]);
   const low52 = parseFloat(overview["52WeekLow"]);
@@ -235,12 +242,19 @@ export default async function AnalyzePage({
 
         {/* ── Key metrics grid ── */}
         <SectionLabel>Key Metrics</SectionLabel>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
           <MetricCard label="Revenue TTM"   value={fmt(overview.RevenueTTM, "large")} />
           <MetricCard label="Profit Margin" value={fmt(overview.ProfitMargin, "percent")} />
           <MetricCard label="EPS (TTM)"     value={fmt(overview.EPS, "currency")} />
           <MetricCard label="52-Week High"  value={fmt(overview["52WeekHigh"], "currency")} primary={false} />
           <MetricCard label="52-Week Low"   value={fmt(overview["52WeekLow"], "currency")} primary={false} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+          <MetricCard label="P/E Ratio"     value={fmt(overview.PERatio, "number")}               primary={false} />
+          <MetricCard label="Forward P/E"   value={fmt(overview.ForwardPE, "number")}             primary={false} />
+          <MetricCard label="ROE"           value={fmt(overview.ReturnOnEquityTTM, "percent")}    primary={false} />
+          <MetricCard label="Debt / Equity" value={deToDisplay(overview.DebtToEquity)}            primary={false} />
+          <MetricCard label="Market Cap"    value={fmt(overview.MarketCapitalization, "large")}   primary={false} />
         </div>
 
         {/* ── Analysis gate: 1 free per day, blur after ── */}

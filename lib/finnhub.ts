@@ -202,6 +202,8 @@ function mapToOverview(
     DividendPerShare:     yahoo?.dividendPerShare != null ? String(yahoo.dividendPerShare) : num(metrics.dividendPerShareAnnual),
     AnalystTargetPrice:   yahoo?.analystTarget != null ? String(yahoo.analystTarget) : num(metrics.priceTargetAverage ?? metrics.priceTargetMedian),
     SharesOutstanding:    yahoo?.sharesOutstanding != null ? String(Math.round(yahoo.sharesOutstanding)) : shares,
+    // D/E: Yahoo raw API returns ×100 (167 = 1.67×) — divide to get actual ratio
+    DebtToEquity:         yahoo?.debtToEquity != null ? String((yahoo.debtToEquity / 100).toFixed(2)) : "None",
   };
 }
 
