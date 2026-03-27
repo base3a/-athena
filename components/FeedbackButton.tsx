@@ -3,7 +3,7 @@
 export default function FeedbackButton() {
   return (
     <a
-      href="https://tally.so/r/EkOKNr"
+      href="https://tally.so/r/Ek0KNr"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Share feedback"
