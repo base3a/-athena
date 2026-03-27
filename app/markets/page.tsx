@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: "Markets",
   description:
     "Is this a risk-on or risk-off environment? Athena's composite market regime indicator gives you a clear answer in seconds.",
+  alternates: {
+    canonical: "/markets",
+  },
 };
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────

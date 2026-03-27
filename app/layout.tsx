@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 // ── Site constants ─────────────────────────────────────────────────────────
-// Set NEXT_PUBLIC_SITE_URL in .env.local when deploying (e.g. https://athenastocks.ai)
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://athenastocks.ai";
+// Set NEXT_PUBLIC_SITE_URL in .env.local when deploying (e.g. https://athenastock.net)
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://athenastock.net";
 const SITE_NAME = "Athena AI";
 const SITE_DESCRIPTION =
   "Athena is an AI-powered stock analysis tool delivering institutional-grade investment research. Enter any ticker for deep fundamental analysis, risk assessment, and an AI investment verdict — powered by Claude AI.";

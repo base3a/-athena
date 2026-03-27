@@ -72,6 +72,8 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-start md:justify-center pt-5 pb-12 md:pt-14 md:pb-16 text-center">
+        {/* SEO H1 — visually hidden, fully readable by search engines */}
+        <h1 className="sr-only">AI-Powered Stock Analysis — Any Ticker, In Seconds</h1>
         <div className="w-full max-w-[1280px] mx-auto px-4 md:px-8 flex flex-col items-center">
 
         {/* ── Desktop-only hero block — focus column ── */}

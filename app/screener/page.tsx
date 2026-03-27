@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Screener",
   description:
     "Discover quality stocks for long-term investors. Filter by ROE, margins, growth, and more. Athena's quality-first stock screener.",
+  alternates: {
+    canonical: "/screener",
+  },
 };
 
 export default function ScreenerPage() {

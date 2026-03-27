@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "Portfolio",
   description:
     "Track your holdings and watchlist. AI-powered Athena verdicts update automatically when you add a stock.",
+  alternates: {
+    canonical: "/portfolio",
+  },
 };
 
 export default function PortfolioPage() {

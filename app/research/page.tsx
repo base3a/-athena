@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: "Research",
   description:
     "AI-curated market intelligence for long-term investors. Sector insights, earnings watch, macro briefings, and deep research.",
+  alternates: {
+    canonical: "/research",
+  },
 };
 
 // ── Static data ────────────────────────────────────────────────────────────────
