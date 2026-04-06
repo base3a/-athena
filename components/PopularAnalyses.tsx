@@ -110,14 +110,55 @@ export default function PopularAnalyses() {
   const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => {
-    const cache = readCache();
+    const localCache = readCache();
+
+    // Phase 1 — instantly paint whatever's already in localStorage (zero latency)
     const data: PillData[] = POPULAR_TICKERS.map((sym) => {
-      const entry = cache[sym];
+      const entry = localCache[sym];
       return entry
         ? { symbol: sym, verdict: entry.verdict, updatedAt: entry.updatedAt }
-        : { symbol: sym, verdict: null,           updatedAt: null };
+        : { symbol: sym, verdict: null, updatedAt: null };
     });
     setPills(data);
+
+    // Phase 2 — fetch server-side cache for any ticker not in localStorage.
+    // This fires for every visitor who hasn't analyzed a ticker themselves,
+    // ensuring ALL users see real verdicts (not just those who've run analyses).
+    const missing = POPULAR_TICKERS.filter((sym) => !localCache[sym]);
+    if (missing.length === 0) return;
+
+    fetch("/api/popular-verdicts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((serverCache: Record<string, CacheEntry> | null) => {
+        if (!serverCache) return;
+
+        // Merge server verdicts into pills for tickers that were missing
+        setPills((prev) => {
+          if (!prev) return prev;
+          return prev.map((pill) => {
+            if (pill.verdict !== null) return pill; // already have a local verdict
+            const entry = serverCache[pill.symbol];
+            if (!entry) return pill;
+            return { symbol: pill.symbol, verdict: entry.verdict, updatedAt: entry.updatedAt };
+          });
+        });
+
+        // Persist server verdicts to localStorage so future loads are instant
+        try {
+          const refreshed = readCache();
+          for (const sym of missing) {
+            if (serverCache[sym] && !refreshed[sym]) {
+              refreshed[sym] = serverCache[sym];
+            }
+          }
+          localStorage.setItem(CACHE_KEY, JSON.stringify(refreshed));
+        } catch {
+          // localStorage unavailable (private browsing) — silent no-op
+        }
+      })
+      .catch(() => {
+        // Network failure — show whatever localStorage provided in Phase 1
+      });
   }, []);
 
   return (

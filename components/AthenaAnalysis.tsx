@@ -2663,21 +2663,35 @@ export default function AthenaAnalysis({ overview, quote }: Props) {
   const isStreaming = phase === "streaming";
 
   // ── Persist verdict to cache after a real (non-fallback) AI analysis ─────────
-  // Saves { verdict, updatedAt } under athena_verdict_cache in localStorage so
-  // the PopularAnalyses component on the homepage can show the real AI verdict.
+  // 1. Saves to localStorage so this user sees the verdict instantly on return.
+  // 2. POSTs to /api/popular-verdicts so ALL users see the verdict on the homepage,
+  //    regardless of whether they've personally analyzed this ticker.
   // Only runs when: analysis is done, verdict is present, and it's a live AI
   // result (not the deterministic fallback).
   useEffect(() => {
     if (phase !== "done" || !verdict || isFallback) return;
+
+    const updatedAt = Date.now();
+
+    // 1. Persist to this user's localStorage
     try {
       const existing = JSON.parse(
         localStorage.getItem("athena_verdict_cache") ?? "{}",
       ) as Record<string, { verdict: string; updatedAt: number }>;
-      existing[overview.Symbol] = { verdict, updatedAt: Date.now() };
+      existing[overview.Symbol] = { verdict, updatedAt };
       localStorage.setItem("athena_verdict_cache", JSON.stringify(existing));
     } catch {
       // localStorage unavailable (SSR guard, private browsing) — silent no-op
     }
+
+    // 2. Update server-side cache so every other visitor benefits immediately
+    fetch("/api/popular-verdicts", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ symbol: overview.Symbol, verdict, updatedAt }),
+    }).catch(() => {
+      // Best-effort — localStorage is the source of truth for this user
+    });
   }, [phase, verdict, isFallback, overview.Symbol]);
 
   const section13 = sections.find((s) => s.number === 13);
