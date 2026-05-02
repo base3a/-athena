@@ -5,7 +5,7 @@ import TickerInput from "@/components/TickerInputNoSSR";
 import StatCard from "@/components/StatCard";
 import FeatureCards from "@/components/FeatureCards";
 import FeaturedAnalysis from "@/components/FeaturedAnalysis";
-import PopularAnalyses from "@/components/PopularAnalyses";
+import MarketIndicesBar from "@/components/MarketIndicesBar";
 import MarketBrief from "@/components/MarketBrief";
 import MarketPulse from "@/components/MarketPulse";
 import MobileNav from "@/components/MobileNav";
@@ -119,7 +119,7 @@ export default function HomePage() {
           <FeaturedAnalysis />
 
           {/* Popular Analyses */}
-          <PopularAnalyses />
+          <MarketIndicesBar />
 
         </div>
 
@@ -190,7 +190,7 @@ export default function HomePage() {
           <FeaturedAnalysis />
 
           {/* Popular Analyses */}
-          <PopularAnalyses />
+          <MarketIndicesBar />
 
         </div>
 
