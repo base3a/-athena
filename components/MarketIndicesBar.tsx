@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 
 interface IndexQuote {
@@ -100,18 +101,30 @@ export default function MarketIndicesBar() {
               const positive = change >= 0;
               const color    = positive ? "#4ade80" : "#f87171";
               return (
-                <div
+                <Link
                   key={symbol}
+                  href="/markets"
                   style={{
-                    display:      "inline-flex",
-                    alignItems:   "center",
-                    gap:          12,
-                    padding:      "10px 16px",
-                    minHeight:    44,
-                    borderRadius: 8,
-                    background:   "#0d0d0d",
-                    border:       "1px solid #1e1e1e",
-                    boxShadow:    "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02)",
+                    display:        "inline-flex",
+                    alignItems:     "center",
+                    gap:            12,
+                    padding:        "10px 16px",
+                    minHeight:      44,
+                    borderRadius:   8,
+                    background:     "#0d0d0d",
+                    border:         "1px solid #1e1e1e",
+                    boxShadow:      "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02)",
+                    textDecoration: "none",
+                    cursor:         "pointer",
+                    transition:     "border-color 0.2s ease, background 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(212,160,23,0.3)";
+                    (e.currentTarget as HTMLAnchorElement).style.background = "#111";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "#1e1e1e";
+                    (e.currentTarget as HTMLAnchorElement).style.background = "#0d0d0d";
                   }}
                 >
                   {/* Index name */}
@@ -153,7 +166,7 @@ export default function MarketIndicesBar() {
                   >
                     {formatChange(change)}&nbsp;({formatPct(changePct)})
                   </span>
-                </div>
+                </Link>
               );
             })}
           </div>
